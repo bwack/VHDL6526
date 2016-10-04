@@ -7,7 +7,7 @@ end tb_timerA;
 
 architecture behaviour of tb_timerA is
   component timerA is
-    port ( 
+  port ( 
 -- DATA AND CONTROL
     PHI2    : in  std_logic; -- clock 1MHz
     DI      : in  std_logic_vector(7 downto 0); -- databus
@@ -19,30 +19,26 @@ architecture behaviour of tb_timerA is
 -- INPUTS
     CNT     : in  std_logic; -- counter
 -- OUTPUTS
-    TMR_OUT_N : out std_logic;
-    PB_ON     : out std_logic; -- enable TMR_OUT_N on PB6 else PB6 is I/O
-    IRQ     : out std_logic
-     );
+    TMR_OUT_N     : out std_logic; -- timer output to PORTB
+    TMR_UNDERFLOW : out std_logic; -- timer A underflow pulses for timer B.
+    PB_ON_EN      : out std_logic; -- enable TMR_OUT_N on PB6 else PB6 is I/O
+    IRQ           : out std_logic
+  );
   end component timerA;
 
   signal PHI2, RES_N, Rd, Wr, CNT, IRQ : std_logic;
   signal DI, DO : std_logic_vector(7 downto 0);
   signal RS : std_logic_Vector(3 downto 0);
-  signal TMR_OUT_N : std_logic;
+  signal TMR_OUT_N, TMR_UNDERFLOW, PB_ON_EN : std_logic;
   constant HALFPERIOD : time := 500 ns;
 begin
   UUT: entity work.timerA(rtl)
     port map (
-       PHI2  =>   PHI2 ,
-       DI    =>   DI   ,
-       DO    =>   DO   ,
-       RS    =>   RS ,
-       RES_N =>   RES_N,
-       Rd    =>   Rd,
-       Wr    =>   Wr,
-       CNT   =>   CNT, 
-       TMR_OUT_N => TMR_OUT_N, 
-       IRQ   =>   IRQ ); 
+      PHI2 => PHI2, DI => DI, DO => DO, RS => RS, RES_N => RES_N, Rd => Rd, Wr => Wr,
+      CNT => CNT, 
+      TMR_OUT_N => TMR_OUT_N, TMR_UNDERFLOW => TMR_UNDERFLOW,
+      PB_ON_EN  => PB_ON_EN,   IRQ => IRQ
+    ); 
 
 P_CLK_0: process
   begin
@@ -84,7 +80,13 @@ P_CNT_0: process
     DI <= "00000001";
     wait for HALFPERIOD*2;
     Wr <= '0';
-    wait for HALFPERIOD*2*250;
+    wait for HALFPERIOD*2*125;
+    Wr <= '1';
+    RS <= x"4";
+    DI <= "00000011";
+    wait for HALFPERIOD*2;
+    Wr <= '0';
+    wait for HALFPERIOD*2*125;
     Wr <= '1';
     RS <= x"E";
     DI <= "00000101";
