@@ -19,26 +19,53 @@ architecture behaviour of tb_timerA is
 -- INPUTS
     CNT     : in  std_logic; -- counter
 -- OUTPUTS
-    TMR_OUT_N     : out std_logic; -- timer output to PORTB
-    TMR_UNDERFLOW : out std_logic; -- timer A underflow pulses for timer B.
-    PB_ON_EN      : out std_logic; -- enable TMR_OUT_N on PB6 else PB6 is I/O
-    IRQ           : out std_logic
+    TMR_OUT_N      : out std_logic; -- timer A output to PORTB
+    TMRA_UNDERFLOW : out std_logic; -- timer A underflow pulses for timer B.
+    PB_ON_EN       : out std_logic; -- enable timer A output on PB6 else PB6 is I/O
+    IRQ            : out std_logic
   );
   end component timerA;
 
-  signal PHI2, RES_N, Rd, Wr, CNT, IRQ : std_logic;
-  signal DI, DO : std_logic_vector(7 downto 0);
-  signal RS : std_logic_Vector(3 downto 0);
-  signal TMR_OUT_N, TMR_UNDERFLOW, PB_ON_EN : std_logic;
+  component timerB is
+  port ( 
+-- DATA AND CONTROL
+    PHI2    : in  std_logic; -- clock 1MHz
+    DI      : in  std_logic_vector(7 downto 0); -- databus
+    DO      : out std_logic_vector(7 downto 0); -- databus
+    RS      : in  std_logic_vector(3 downto 0); -- address - register select
+    RES_N   : in  std_logic; -- global reset
+    Rd, Wr  : in  std_logic; -- read and write registers
+-- INPUTS
+    CNT     : in  std_logic; -- counter
+    TMRA_UNDERFLOW : in std_logic; -- underflow pulses from timer A.
+-- OUTPUTS
+    TMR_OUT_N      : out std_logic; -- timer B output to PORTB
+    PB_ON_EN       : out std_logic; -- enable timer B output on PB7 else PB7 is I/O
+    IRQ            : out std_logic
+  );
+  end component timerB;
+
+  signal PHI2, RES_N, Rd, Wr : std_logic;
+  signal DI, DO              : std_logic_vector(7 downto 0);
+  signal RS                  : std_logic_Vector(3 downto 0);
+  signal TMRA_OUT_N, TMRB_OUT_N, TMRA_UNDERFLOW : std_logic;
+  signal TMRA_PB_ON_EN, TMRB_PB_ON_EN, CNT, TMRA_IRQ, TMRB_IRQ : std_logic;
   constant HALFPERIOD : time := 500 ns;
 begin
-  UUT: entity work.timerA(rtl)
+  UUT_TMRA: entity work.timerA(rtl)
     port map (
-      PHI2 => PHI2, DI => DI, DO => DO, RS => RS, RES_N => RES_N, Rd => Rd, Wr => Wr,
-      CNT => CNT, 
-      TMR_OUT_N => TMR_OUT_N, TMR_UNDERFLOW => TMR_UNDERFLOW,
-      PB_ON_EN  => PB_ON_EN,   IRQ => IRQ
-    ); 
+      PHI2=>PHI2, DI=>DI, DO=>DO, RS=>RS, RES_N=>RES_N, Rd=>Rd, Wr=>Wr,
+      CNT => CNT, TMR_OUT_N => TMRA_OUT_N, TMRA_UNDERFLOW => TMRA_UNDERFLOW,
+      PB_ON_EN => TMRA_PB_ON_EN, IRQ => TMRA_IRQ
+    );
+
+  UUT_TMRB: entity work.timerB(rtl)
+    port map (
+      PHI2=>PHI2, DI=>DI, DO=>DO, RS=>RS, RES_N=>RES_N, Rd=>Rd, Wr=>Wr,
+      CNT => CNT, TMRA_UNDERFLOW => TMRA_UNDERFLOW,
+      TMR_OUT_N => TMRB_OUT_N, PB_ON_EN  => TMRB_PB_ON_EN, IRQ => TMRB_IRQ
+    );
+
 
 P_CLK_0: process
   begin
@@ -76,6 +103,20 @@ P_CNT_0: process
     Wr <= '0';
     wait for HALFPERIOD*2;
     Wr <= '1';
+    RS <= x"6";
+    DI <= "00001110";
+    wait for HALFPERIOD*2;
+    Wr <= '1';
+    RS <= x"7";
+    DI <= "00000000";
+    wait for HALFPERIOD*2;
+    Wr <= '0';
+    wait for HALFPERIOD*2;
+    Wr <= '1';
+    RS <= x"F";
+    DI <= "00000001";
+    wait for HALFPERIOD*2;
+    Wr <= '1';
     RS <= x"E";
     DI <= "00000001";
     wait for HALFPERIOD*2;
@@ -84,6 +125,9 @@ P_CNT_0: process
     Wr <= '1';
     RS <= x"4";
     DI <= "00000011";
+    wait for HALFPERIOD*2;
+    RS <= x"6";
+    DI <= "00010011";
     wait for HALFPERIOD*2;
     Wr <= '0';
     wait for HALFPERIOD*2*125;
@@ -104,6 +148,44 @@ P_CNT_0: process
     DI <= "00001011";
     wait for HALFPERIOD*2;
     Wr <= '0';
+    wait for HALFPERIOD*2*55;
+
+
+    res_n <= '0';
+    wait for HALFPERIOD*2;
+    res_n <= '1';
+    wait for HALFPERIOD*2;
+    Wr <= '1';
+    RS <= x"4";
+    DI <= "00000011";
+    wait for HALFPERIOD*2;
+    Wr <= '1';
+    RS <= x"5";
+    DI <= "00000000";
+    wait for HALFPERIOD*2;
+    Wr <= '0';
+    wait for HALFPERIOD*2;
+    Wr <= '1';
+    RS <= x"6";
+    DI <= "00001110";
+    wait for HALFPERIOD*2;
+    Wr <= '1';
+    RS <= x"7";
+    DI <= "00000000";
+    wait for HALFPERIOD*2;
+    Wr <= '0';
+    wait for HALFPERIOD*2;
+    Wr <= '1';
+    RS <= x"E";
+    DI <= "00000001";
+    wait for HALFPERIOD*2;
+    Wr <= '0';
+    wait for HALFPERIOD*2;
+    Wr <= '1';
+    RS <= x"F";
+    DI <= "01000001";
+    wait for HALFPERIOD*2;
+
     wait;
   end process;
 

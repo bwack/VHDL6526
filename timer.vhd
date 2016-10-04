@@ -17,10 +17,10 @@ entity timerA is
 -- INPUTS
     CNT     : in  std_logic; -- counter
 -- OUTPUTS
-    TMR_OUT_N     : out std_logic; -- timer A output to PORTB
-    TMR_UNDERFLOW : out std_logic; -- timer A underflow pulses for timer B.
-    PB_ON_EN      : out std_logic; -- enable timer A output on PB6 else PB6 is I/O
-    IRQ           : out std_logic
+    TMR_OUT_N      : out std_logic; -- timer A output to PORTB
+    TMRA_UNDERFLOW : out std_logic; -- timer A underflow pulses for timer B.
+    PB_ON_EN       : out std_logic; -- enable timer A output on PB6 else PB6 is I/O
+    IRQ            : out std_logic
   );
 end entity timerA;
 
@@ -49,10 +49,10 @@ architecture rtl of timerA is
 begin
 
 TMR_OUT_N <= TMROUT_N;
-TMR_UNDERFLOW <= underflow_flag;
+TMRA_UNDERFLOW <= underflow_flag;
 PB_ON_EN <= CRA_PBON;
 IRQ <= underflow_flag;
--- underflow
+
   timeroutput: process (RES_N,underflow_flag) is
   begin
     if RES_N = '0' then 
@@ -180,7 +180,7 @@ entity timerB is
     Rd, Wr  : in  std_logic; -- read and write registers
 -- INPUTS
     CNT     : in  std_logic; -- counter
-    TMRA_UNDERFLOW : in std_logic; -- underflow pulses from timer B.
+    TMRA_UNDERFLOW : in std_logic; -- underflow pulses from timer A.
 -- OUTPUTS
     TMR_OUT_N      : out std_logic; -- timer B output to PORTB
     PB_ON_EN       : out std_logic; -- enable timer B output on PB7 else PB7 is I/O
@@ -217,10 +217,9 @@ architecture rtl of timerB is
 begin
 
 TMR_OUT_N <= TMROUT_N;
-TMR_UNDERFLOW <= underflow_flag;
 PB_ON_EN <= CRB_PBON;
 IRQ <= underflow_flag;
--- underflow
+
   timeroutput: process (RES_N,underflow_flag) is
   begin
     if RES_N = '0' then 
@@ -234,7 +233,12 @@ IRQ <= underflow_flag;
 
 
 -- TIMER CLOCK
-    TMRBCLOCK <= PHI2 when CRB_INMODE = '0' else CNT; -- modify this line !
+  with CRB_INMODE select
+      TMRBCLOCK <= PHI2                   when "00",
+                   CNT                    when "01",
+                   TMRA_UNDERFLOW         when "10",
+                   TMRA_UNDERFLOW and CNT when "11",
+                   '0' when others;
 
 -- TIMER
   timerB: process (TMRBCLOCK,RES_N,CRB_LOAD) is
@@ -249,7 +253,7 @@ IRQ <= underflow_flag;
         underflow_flag <= '0';
       if TMRB = "0000000000000000" and CRB_START = '1' then
         underflow_flag <= '1';
-        TMRA <= TB_HI & TB_LO;
+        TMRB <= TB_HI & TB_LO;
       elsif CRB_START = '1' then
           TMR := TMRB;
           TMR := TMR - 1;
@@ -290,7 +294,7 @@ IRQ <= underflow_flag;
                        CRB_START     <= DI(0);
           when others => null;
         end case;
-        if RS = x"5" and CRB_START = '0' then
+        if RS = x"7" and CRB_START = '0' then
           CRB_LOAD <= '1';
         end if;
       end if;
