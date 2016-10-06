@@ -1,6 +1,7 @@
 library ieee;
 use ieee.std_logic_1164.all;
-use IEEE.numeric_std.ALL;
+use ieee.std_logic_arith.all;
+use ieee.std_logic_unsigned.all;
 
 entity timerA is
 -- Interval Timer: 16 bit read-only Timer Counter
@@ -26,8 +27,8 @@ end entity timerA;
 
 architecture rtl of timerA is
 -- REGISTERS
-  signal TA_LO       : unsigned(7 downto 0); -- TMR LATCH LOAD VALUE LO
-  signal TA_HI       : unsigned(7 downto 0); -- TMR LATCH LOAD VALUE HI
+  signal TA_LO       : std_logic_vector(7 downto 0); -- TMR LATCH LOAD VALUE LO
+  signal TA_HI       : std_logic_vector(7 downto 0); -- TMR LATCH LOAD VALUE HI
   signal CRA_START   : std_logic; -- 1=start TMRA, 0=Stop TMRA
   signal CRA_PBON    : std_logic; -- 1=PB6 TMRA output, 0=PB6 I/O
   signal CRA_OUTMODE : std_logic; -- 1=toggle, 0=pulse
@@ -36,12 +37,13 @@ architecture rtl of timerA is
   signal CRA_INMODE  : std_logic; -- 1=Count on rising CNT, 0=Count PHI2
   signal CRA_SPMODE  : std_logic; -- 1=Serial Port output, 0=SP input (req ext shift clock)
   signal CRA_TODIN   : std_logic; -- 1=50Hz clock on TOD pin, 0=60Hz.
-  signal TMRA        : unsigned(15 downto 0); -- read only timer counter
+  signal TMRA        : std_logic_vector(15 downto 0); -- read only timer counter
 -- OTHER
   signal TMRACLOCK   : std_logic;
   signal TMROUT_N    : std_logic;
 -- flags and other data
   signal underflow_flag : std_logic;
+  signal old_underflow  : std_logic;
   signal data      : std_logic_vector(7 downto 0); -- data for DO
   signal read_flag : std_logic; -- tristate control of DO
   signal mydebug : std_logic;
@@ -49,19 +51,22 @@ architecture rtl of timerA is
 begin
 
 TMR_OUT_N <= TMROUT_N;
-TMRA_UNDERFLOW <= underflow_flag;
+TMRA_UNDERFLOW <= '1' when underflow_flag = '1' and old_underflow = '0' else '0';
 PB_ON_EN <= CRA_PBON;
-IRQ <= underflow_flag;
+IRQ <= '1' when underflow_flag = '1' and old_underflow = '0' else '0';
 
-  timeroutput: process (RES_N,underflow_flag) is
+  timeroutput: process (PHI2,RES_N) is
   begin
     if RES_N = '0' then 
       TMROUT_N <= '1';
-    elsif underflow_flag = '1' then
-      TMROUT_N <= not TMROUT_N;
-    elsif CRA_OUTMODE = '0' then
-      TMROUT_N <= '1';
-    end if;       
+    elsif rising_edge(PHI2) then
+      old_underflow <= underflow_flag;
+      if underflow_flag = '1' and old_underflow = '0' then
+        TMROUT_N <= not TMROUT_N;
+      elsif CRA_OUTMODE = '0' then
+        TMROUT_N <= '1';
+      end if;
+    end if;      
   end process;
 
 
@@ -70,7 +75,6 @@ IRQ <= underflow_flag;
 
 -- TIMER
   timerA: process (TMRACLOCK,RES_N,CRA_LOAD) is
-    variable TMR : unsigned(15 downto 0);
   begin
     if RES_N = '0' then
       TMRA <= x"ffff";
@@ -83,9 +87,7 @@ IRQ <= underflow_flag;
         underflow_flag <= '1';
         TMRA <= TA_HI & TA_LO;
       elsif CRA_START = '1' then
-          TMR := TMRA;
-          TMR := TMR - 1;
-          TMRA <= TMR;
+          TMRA <= TMRA - 1;
       end if;
     end if;
   end process timerA;
@@ -106,13 +108,13 @@ IRQ <= underflow_flag;
       CRA_TODIN  <= '0';
     elsif rising_edge(PHI2) then
       CRA_LOAD <= '0';
-      if CRA_RUNMODE = '1' and TMRA = "0000000000000000" then
+      if CRA_RUNMODE = '1' and underflow_flag = '1' then
         CRA_START <= '0';
       end if;
       if Wr = '1' then 
         case RS is
-          when x"4" => TA_LO <= unsigned(DI);
-          when x"5" => TA_HI <= unsigned(DI);
+          when x"4" => TA_LO <= DI;
+          when x"5" => TA_HI <= DI;
           when x"E" => CRA_TODIN   <= DI(7);
                        CRA_SPMODE  <= DI(6);
                        CRA_INMODE  <= DI(5);
@@ -139,8 +141,8 @@ IRQ <= underflow_flag;
       read_flag <= '0';
       if Rd = '1' then
         case RS is
-          when x"4" => data <= std_logic_vector(TMRA(7 downto 0));  read_flag <= '1';
-          when x"5" => data <= std_logic_vector(TMRA(15 downto 8)); read_flag <= '1';
+          when x"4" => data <= TMRA(7 downto 0);  read_flag <= '1';
+          when x"5" => data <= TMRA(15 downto 8); read_flag <= '1';
           when x"E" => data <= (
                                  CRA_TODIN   &
                                  CRA_SPMODE  &
@@ -165,7 +167,8 @@ end architecture;
 
 library ieee;
 use ieee.std_logic_1164.all;
-use IEEE.numeric_std.ALL;
+use ieee.std_logic_arith.all;
+use ieee.std_logic_unsigned.all;
 
 entity timerB is
 -- Interval Timer: 16 bit read-only Timer Counter
@@ -190,8 +193,8 @@ end entity timerB;
 
 architecture rtl of timerB is
 -- REGISTERS
-  signal TB_LO       : unsigned(7 downto 0); -- TMR LATCH LOAD VALUE LO
-  signal TB_HI       : unsigned(7 downto 0); -- TMR LATCH LOAD VALUE HI
+  signal TB_LO   : std_logic_vector(7 downto 0); -- TMR LATCH LOAD VALUE LO
+  signal TB_HI   : std_logic_vector(7 downto 0); -- TMR LATCH LOAD VALUE HI
   signal CRB_START   : std_logic; -- 1=start TMRB, 0=Stop TMRB
   signal CRB_PBON    : std_logic; -- 1=PB7 TMRB output, 0=PB7 I/O
   signal CRB_OUTMODE : std_logic; -- 1=toggle, 0=pulse
@@ -204,31 +207,36 @@ architecture rtl of timerB is
                                                      --        while CNT is high
   signal CRB_ALARM   : std_logic; -- 1=Writing to TOD registers sets ALARM
                                   -- 0=Writing to TOD registers sets TOD clock
-  signal TMRB        : unsigned(15 downto 0); -- read only timer counter
+  signal TMRB        : std_logic_vector(15 downto 0); -- read only timer counter
 -- OTHER
   signal TMRBCLOCK   : std_logic;
   signal TMROUT_N    : std_logic;
 -- flags and other data
   signal underflow_flag : std_logic;
+  signal old_underflow  : std_logic;
   signal data      : std_logic_vector(7 downto 0); -- data for DO
   signal read_flag : std_logic; -- tristate control of DO
   signal mydebug : std_logic;
 
-begin
+begin 
 
-TMR_OUT_N <= TMROUT_N;
-PB_ON_EN <= CRB_PBON;
-IRQ <= underflow_flag;
+  TMR_OUT_N <= TMROUT_N;
+  PB_ON_EN <= CRB_PBON;
+  IRQ <= '1' when underflow_flag = '1' and old_underflow = '0' else '0';
 
-  timeroutput: process (RES_N,underflow_flag) is
+
+  timeroutput: process (PHI2,RES_N) is
   begin
     if RES_N = '0' then 
       TMROUT_N <= '1';
-    elsif underflow_flag = '1' then
-      TMROUT_N <= not TMROUT_N;
-    elsif CRB_OUTMODE = '0' then
-      TMROUT_N <= '1';
-    end if;       
+    elsif rising_edge(PHI2) then
+      old_underflow <= underflow_flag;
+      if underflow_flag = '1' and old_underflow = '0' then
+        TMROUT_N <= not TMROUT_N;
+      elsif CRB_OUTMODE = '0' then
+        TMROUT_N <= '1';
+      end if;
+    end if;      
   end process;
 
 
@@ -242,7 +250,6 @@ IRQ <= underflow_flag;
 
 -- TIMER
   timerB: process (TMRBCLOCK,RES_N,CRB_LOAD) is
-    variable TMR : unsigned(15 downto 0);
   begin
     if RES_N = '0' then
       TMRB <= x"ffff";
@@ -255,9 +262,7 @@ IRQ <= underflow_flag;
         underflow_flag <= '1';
         TMRB <= TB_HI & TB_LO;
       elsif CRB_START = '1' then
-          TMR := TMRB;
-          TMR := TMR - 1;
-          TMRB <= TMR;
+          TMRB <= TMRB - 1;
       end if;
     end if;
   end process timerB;
@@ -277,13 +282,14 @@ IRQ <= underflow_flag;
       CRB_ALARM  <= '0';
     elsif rising_edge(PHI2) then
       CRB_LOAD <= '0';
-      if CRB_RUNMODE = '1' and TMRB = "0000000000000000" then
+      if CRB_RUNMODE = '1' and underflow_flag = '0' then
         CRB_START <= '0';
+        CRB_LOAD  <= '1';
       end if;
       if Wr = '1' then 
         case RS is
-          when x"6" => TB_LO <= unsigned(DI);
-          when x"7" => TB_HI <= unsigned(DI);
+          when x"6" => TB_LO <= DI;
+          when x"7" => TB_HI <= DI;
           when x"F" => CRB_ALARM     <= DI(7);
                        CRB_INMODE(1) <= DI(6);
                        CRB_INMODE(0) <= DI(5);
@@ -310,8 +316,8 @@ IRQ <= underflow_flag;
       read_flag <= '0';
       if Rd = '1' then
         case RS is
-          when x"6" => data <= std_logic_vector(TMRB(7 downto 0));  read_flag <= '1';
-          when x"7" => data <= std_logic_vector(TMRB(15 downto 8)); read_flag <= '1';
+          when x"6" => data <= TMRB(7 downto 0);  read_flag <= '1';
+          when x"7" => data <= TMRB(15 downto 8); read_flag <= '1';
           when x"F" => data <= (
                                  CRB_ALARM   &
                                  CRB_INMODE  &

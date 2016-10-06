@@ -1,0 +1,1 @@
+-- simulate TMRA/B, check tmrb in one-shot mode.
