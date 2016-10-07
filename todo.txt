@@ -1,1 +1,57 @@
--- simulate TMRA/B, check tmrb in one-shot mode.
+testing (copy paste from datasheet):
+
+Interval Timers (Timer A, Timer B):
+1. Each interval timer consists of a 16-bit read-only
+Timer Counter and a 16-bit write-only Timer Latch.
+2. Data written to the timer are latched in the Timer Latch, while
+3. data read from the timer are the present contents of the
+Timer Counter.
+4. The timers can be used independently 
+5. or linked for extended operations.
+
+Start/Stop: OK
+A control bit allows the timer to be started or stopped
+by the microprocessor at any time.
+
+PB On/Off: timerab ok, portb connected to the timers not tested.
+1. A control bit allows the timer output to appear on a
+PORT B output line (PB6 for TIMER A and PB7 for
+TIMER B).
+2. This function overrides the DDRB control
+bit and forces the appropriate PB line to an output.
+
+Toggle/Pulse: tested ok.
+1. A control bit selects the output applied to PORT B.
+2. On every timer underflow the output can either toggle or
+generate a single positive pulse of one cycle duration.
+3. The Toggle output is set high whenever the timer is
+started and is set low by RES. 
+
+One-Short/Continuous: tested ok
+1. A control bit selects either timer mode.
+2. In one-shot mode, the timer will count down from the
+   latched value to zero, generate an interrupt, reload the latched
+   value, then stop.
+3. In continuous mode, the timer will count from the latched value
+   to zero, generate an interrupt, reload the latched value and
+   repeatthe procedure continuously .
+
+Force Load: tested ok
+A strobe bit allows the timer latch to be loaded into the
+timer counter at any time, whether the timer is running or
+not.
+
+Input Mode:
+1. Control bits allow selection of the clock used to decrement
+   the timer,
+2. TIMER A can count 02 clock pulses or
+   external pulses applied to the CNT pin.
+3. TIMER B can count 02 pulses, external CNT pulses,
+   TIMER A underflow pulses or TIMER A underflow pulses
+   while the CNT pin is held high.
+4. The timer latch is loaded into the timer on any timer
+   underflow, on a force load or following a write to the high
+   byte of the prescaler while the timer is stopped.
+5. If the timer is running, a write to the high byte will load the
+   timer latch, but not reload the counter.
+

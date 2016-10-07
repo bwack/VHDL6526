@@ -19,7 +19,7 @@ architecture behaviour of tb_timerA is
 -- INPUTS
     CNT     : in  std_logic; -- counter
 -- OUTPUTS
-    TMR_OUT_N      : out std_logic; -- timer A output to PORTB
+    TMR_OUT        : out std_logic; -- timer A output to PORTB
     TMRA_UNDERFLOW : out std_logic; -- timer A underflow pulses for timer B.
     PB_ON_EN       : out std_logic; -- enable timer A output on PB6 else PB6 is I/O
     IRQ            : out std_logic
@@ -39,7 +39,7 @@ architecture behaviour of tb_timerA is
     CNT     : in  std_logic; -- counter
     TMRA_UNDERFLOW : in std_logic; -- underflow pulses from timer A.
 -- OUTPUTS
-    TMR_OUT_N      : out std_logic; -- timer B output to PORTB
+    TMR_OUT        : out std_logic; -- timer B output to PORTB
     PB_ON_EN       : out std_logic; -- enable timer B output on PB7 else PB7 is I/O
     IRQ            : out std_logic
   );
@@ -48,14 +48,14 @@ architecture behaviour of tb_timerA is
   signal PHI2, RES_N, Rd, Wr : std_logic;
   signal DI, DO              : std_logic_vector(7 downto 0);
   signal RS                  : std_logic_Vector(3 downto 0);
-  signal TMRA_OUT_N, TMRB_OUT_N, TMRA_UNDERFLOW : std_logic;
+  signal TMRA_OUT, TMRB_OUT, TMRA_UNDERFLOW : std_logic;
   signal TMRA_PB_ON_EN, TMRB_PB_ON_EN, CNT, TMRA_IRQ, TMRB_IRQ : std_logic;
   constant HALFPERIOD : time := 500 ns;
 begin
   UUT_TMRA: entity work.timerA(rtl)
     port map (
       PHI2=>PHI2, DI=>DI, DO=>DO, RS=>RS, RES_N=>RES_N, Rd=>Rd, Wr=>Wr,
-      CNT => CNT, TMR_OUT_N => TMRA_OUT_N, TMRA_UNDERFLOW => TMRA_UNDERFLOW,
+      CNT => CNT, TMR_OUT => TMRA_OUT, TMRA_UNDERFLOW => TMRA_UNDERFLOW,
       PB_ON_EN => TMRA_PB_ON_EN, IRQ => TMRA_IRQ
     );
 
@@ -63,7 +63,7 @@ begin
     port map (
       PHI2=>PHI2, DI=>DI, DO=>DO, RS=>RS, RES_N=>RES_N, Rd=>Rd, Wr=>Wr,
       CNT => CNT, TMRA_UNDERFLOW => TMRA_UNDERFLOW,
-      TMR_OUT_N => TMRB_OUT_N, PB_ON_EN  => TMRB_PB_ON_EN, IRQ => TMRB_IRQ
+      TMR_OUT => TMRB_OUT, PB_ON_EN  => TMRB_PB_ON_EN, IRQ => TMRB_IRQ
     );
 
 
@@ -95,17 +95,15 @@ P_CNT_0: process
 
    Wr <= '1';
    RS <= x"4";
-   DI <= "00000010";
+   DI <= "00001010";
    wait for HALFPERIOD*2;
    Wr <= '1';
    RS <= x"5";
    DI <= "00000000";
- --  wait for HALFPERIOD*2;
---   Wr <= '0';
    wait for HALFPERIOD*2;
    Wr <= '1';
    RS <= x"6";
-   DI <= "00000011";
+   DI <= "00001010";
    wait for HALFPERIOD*2;
    Wr <= '1';
    RS <= x"7";
@@ -115,13 +113,41 @@ P_CNT_0: process
    wait for HALFPERIOD*2;
    Wr <= '1';
    RS <= x"F";
-   DI <= "01001001";
+   DI <= "00001011";
    wait for HALFPERIOD*2;
    Wr <= '1';
    RS <= x"E";
-   DI <= "00000001";
+   DI <= "00001011";
    wait for HALFPERIOD*2;
    Wr <= '0';
+
+   wait for HALFPERIOD*2*4;
+
+   Wr <= '1';
+   RS <= x"F";
+   DI <= "00011011";
+   wait for HALFPERIOD*2;
+   Wr <= '1';
+   RS <= x"E";
+   DI <= "00011011";
+   wait for HALFPERIOD*2;
+   Wr <= '0';
+
+   wait for HALFPERIOD*2*35;
+
+   Wr <= '1';
+   RS <= x"F";
+   DI <= "00011011";
+   wait for HALFPERIOD*2;
+   Wr <= '1';
+   RS <= x"E";
+   DI <= "00011011";
+   wait for HALFPERIOD*2;
+   Wr <= '0';
+
+   wait for HALFPERIOD*2*225;
+
+
 
 --   Wr <= '0';
 
@@ -225,7 +251,7 @@ P_CNT_0: process
  --   DI <= "01000001";
  --   wait for HALFPERIOD*2;
 
-    wait;
+ --  wait;
   end process;
 
 

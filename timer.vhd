@@ -18,7 +18,7 @@ entity timerA is
 -- INPUTS
     CNT     : in  std_logic; -- counter
 -- OUTPUTS
-    TMR_OUT_N      : out std_logic; -- timer A output to PORTB
+    TMR_OUT        : out std_logic; -- timer A output to PORTB
     TMRA_UNDERFLOW : out std_logic; -- timer A underflow pulses for timer B.
     PB_ON_EN       : out std_logic; -- enable timer A output on PB6 else PB6 is I/O
     IRQ            : out std_logic
@@ -39,49 +39,57 @@ architecture rtl of timerA is
   signal CRA_TODIN   : std_logic; -- 1=50Hz clock on TOD pin, 0=60Hz.
   signal TMRA        : std_logic_vector(15 downto 0); -- read only timer counter
 -- OTHER
-  signal TMRACLOCK   : std_logic;
-  signal TMROUT_N    : std_logic;
+  signal TMRCLOCK    : std_logic;
+  signal TMRCLKSYNC  : std_logic; -- synced to phi2
+  signal TMRTOGGLE   : std_logic;
 -- flags and other data
   signal underflow_flag : std_logic;
   signal old_underflow  : std_logic;
   signal data      : std_logic_vector(7 downto 0); -- data for DO
   signal read_flag : std_logic; -- tristate control of DO
-  signal mydebug : std_logic;
 
 begin
 
-TMR_OUT_N <= TMROUT_N;
-TMRA_UNDERFLOW <= '1' when underflow_flag = '1' and old_underflow = '0' else '0';
-PB_ON_EN <= CRA_PBON;
-IRQ <= '1' when underflow_flag = '1' and old_underflow = '0' else '0';
+TMR_OUT        <= (underflow_flag and not old_underflow) when CRA_OUTMODE = '0'
+                  else TMRTOGGLE;
+TMRA_UNDERFLOW <= underflow_flag and not old_underflow;
+PB_ON_EN       <= CRA_PBON;
+IRQ            <= underflow_flag and not old_underflow;
+
+  timertoggle: process(PHI2,RES_N,underflow_flag)
+    variable old_start : std_logic ;
+  begin
+    if RES_N = '0' then
+      TMRTOGGLE <= '0';
+    end if;
+    if rising_edge(phi2) and CRA_START = '1' and old_start = '0' then
+      TMRTOGGLE <= '1';
+    elsif rising_edge(underflow_flag) then
+      TMRTOGGLE <= not TMRTOGGLE;
+    end if;
+    old_start := CRA_START;
+  end process;
 
   timeroutput: process (PHI2,RES_N) is
   begin
-    if RES_N = '0' then 
-      TMROUT_N <= '1';
-    elsif rising_edge(PHI2) then
+    if rising_edge(PHI2) then
       old_underflow <= underflow_flag;
-      if underflow_flag = '1' and old_underflow = '0' then
-        TMROUT_N <= not TMROUT_N;
-      elsif CRA_OUTMODE = '0' then
-        TMROUT_N <= '1';
-      end if;
     end if;      
   end process;
 
 
 -- TIMER CLOCK
-    TMRACLOCK <= PHI2 when CRA_INMODE = '0' else CNT;
+    TMRCLOCK <= PHI2 when CRA_INMODE = '0' else CNT;
 
 -- TIMER
-  timerA: process (TMRACLOCK,RES_N,CRA_LOAD) is
+  timerA: process (TMRCLOCK,RES_N,CRA_LOAD) is
   begin
     if RES_N = '0' then
       TMRA <= x"ffff";
       underflow_flag <= '0';
     elsif CRA_LOAD = '1' then
       TMRA <= TA_HI & TA_LO;
-    elsif rising_edge(TMRACLOCK) then
+    elsif rising_edge(TMRCLOCK) then
         underflow_flag <= '0';
       if TMRA = "0000000000000000" and CRA_START = '1' then
         underflow_flag <= '1';
@@ -106,7 +114,7 @@ IRQ <= '1' when underflow_flag = '1' and old_underflow = '0' else '0';
       CRA_INMODE <= '0';
       CRA_SPMODE <= '0';
       CRA_TODIN  <= '0';
-    elsif rising_edge(PHI2) then
+    elsif falling_edge(PHI2) then
       CRA_LOAD <= '0';
       if CRA_RUNMODE = '1' and underflow_flag = '1' then
         CRA_START <= '0';
@@ -137,7 +145,7 @@ IRQ <= '1' when underflow_flag = '1' and old_underflow = '0' else '0';
   DO <= data when read_flag = '1' else (others => 'Z');
   process (PHI2,RES_N) is
   begin
-    if rising_edge(PHI2) then
+    if falling_edge(PHI2) then
       read_flag <= '0';
       if Rd = '1' then
         case RS is
@@ -185,7 +193,7 @@ entity timerB is
     CNT     : in  std_logic; -- counter
     TMRA_UNDERFLOW : in std_logic; -- underflow pulses from timer A.
 -- OUTPUTS
-    TMR_OUT_N      : out std_logic; -- timer B output to PORTB
+    TMR_OUT        : out std_logic; -- timer B output to PORTB
     PB_ON_EN       : out std_logic; -- enable timer B output on PB7 else PB7 is I/O
     IRQ            : out std_logic
   );
@@ -209,54 +217,63 @@ architecture rtl of timerB is
                                   -- 0=Writing to TOD registers sets TOD clock
   signal TMRB        : std_logic_vector(15 downto 0); -- read only timer counter
 -- OTHER
-  signal TMRBCLOCK   : std_logic;
-  signal TMROUT_N    : std_logic;
+  signal TMRCLOCK    : std_logic;
+  signal TMRCLKSYNC  : std_logic; -- synced to phi2
+  signal TMRTOGGLE   : std_logic;
 -- flags and other data
   signal underflow_flag : std_logic;
   signal old_underflow  : std_logic;
+  --signal old_start      : std_logic;
   signal data      : std_logic_vector(7 downto 0); -- data for DO
   signal read_flag : std_logic; -- tristate control of DO
   signal mydebug : std_logic;
 
 begin 
 
-  TMR_OUT_N <= TMROUT_N;
-  PB_ON_EN <= CRB_PBON;
-  IRQ <= '1' when underflow_flag = '1' and old_underflow = '0' else '0';
+TMR_OUT        <= (underflow_flag and not old_underflow) when CRB_OUTMODE = '0'
+                  else TMRTOGGLE;
+PB_ON_EN       <= CRB_PBON;
+IRQ            <= underflow_flag and not old_underflow;
 
+  timertoggle: process(PHI2,RES_N,underflow_flag)
+    variable old_start : std_logic ;
+  begin
+    if RES_N = '0' then
+      TMRTOGGLE <= '0';
+    end if;
+    if rising_edge(phi2) and CRB_START = '1' and old_start = '0' then
+      TMRTOGGLE <= '1'; -- timer just started, set toggle to 1
+    elsif rising_edge(underflow_flag) then
+      TMRTOGGLE <= not TMRTOGGLE;
+    end if;
+    old_start := CRB_START;
+  end process;
 
   timeroutput: process (PHI2,RES_N) is
   begin
-    if RES_N = '0' then 
-      TMROUT_N <= '1';
-    elsif rising_edge(PHI2) then
+    if rising_edge(PHI2) then
       old_underflow <= underflow_flag;
-      if underflow_flag = '1' and old_underflow = '0' then
-        TMROUT_N <= not TMROUT_N;
-      elsif CRB_OUTMODE = '0' then
-        TMROUT_N <= '1';
-      end if;
     end if;      
   end process;
 
 
 -- TIMER CLOCK
   with CRB_INMODE select
-      TMRBCLOCK <= PHI2                   when "00",
+      TMRCLOCK <= PHI2                   when "00",
                    CNT                    when "01",
                    TMRA_UNDERFLOW         when "10",
                    TMRA_UNDERFLOW and CNT when "11",
                    '0' when others;
 
 -- TIMER
-  timerB: process (TMRBCLOCK,RES_N,CRB_LOAD) is
+  timerB: process (TMRCLOCK,RES_N,CRB_LOAD) is
   begin
     if RES_N = '0' then
       TMRB <= x"ffff";
       underflow_flag <= '0';
     elsif CRB_LOAD = '1' then
       TMRB <= TB_HI & TB_LO;
-    elsif rising_edge(TMRBCLOCK) then
+    elsif rising_edge(TMRCLOCK) then
         underflow_flag <= '0';
       if TMRB = "0000000000000000" and CRB_START = '1' then
         underflow_flag <= '1';
@@ -280,11 +297,10 @@ begin
       CRB_LOAD   <= '0';
       CRB_INMODE <= "00";
       CRB_ALARM  <= '0';
-    elsif rising_edge(PHI2) then
+    elsif falling_edge(PHI2) then
       CRB_LOAD <= '0';
-      if CRB_RUNMODE = '1' and underflow_flag = '0' then
+      if CRB_RUNMODE = '1' and underflow_flag = '1' then
         CRB_START <= '0';
-        CRB_LOAD  <= '1';
       end if;
       if Wr = '1' then 
         case RS is
@@ -312,7 +328,7 @@ begin
   DO <= data when read_flag = '1' else (others => 'Z');
   process (PHI2,RES_N) is
   begin
-    if rising_edge(PHI2) then
+    if falling_edge(PHI2) then
       read_flag <= '0';
       if Rd = '1' then
         case RS is
