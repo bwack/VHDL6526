@@ -40,7 +40,7 @@ architecture rtl of timerA is
   signal TMRA        : std_logic_vector(15 downto 0); -- read only timer counter
 -- OTHER
   signal TMRCLOCK    : std_logic;
-  signal TMRCLKSYNC  : std_logic; -- synced to phi2
+  signal CNTSYNCED   : std_logic; -- synced to phi2
   signal TMRTOGGLE   : std_logic;
 -- flags and other data
   signal underflow_flag : std_logic;
@@ -77,9 +77,16 @@ IRQ            <= underflow_flag and not old_underflow;
     end if;      
   end process;
 
+-- Resyncing CNT is important to maintain one-cycle length underflow pulses.
+  cntsync: process (PHI2,RES_N) is
+  begin
+    if rising_edge(PHI2) then
+      CNTSYNCED <= CNT;
+    end if;      
+  end process;
 
 -- TIMER CLOCK
-    TMRCLOCK <= PHI2 when CRA_INMODE = '0' else CNT;
+    TMRCLOCK <= PHI2 when CRA_INMODE = '0' else CNTSYNCED;
 
 -- TIMER
   timerA: process (TMRCLOCK,RES_N,CRA_LOAD) is
@@ -218,7 +225,7 @@ architecture rtl of timerB is
   signal TMRB        : std_logic_vector(15 downto 0); -- read only timer counter
 -- OTHER
   signal TMRCLOCK    : std_logic;
-  signal TMRCLKSYNC  : std_logic; -- synced to phi2
+  signal CNTSYNCED   : std_logic; -- synced to phi2
   signal TMRTOGGLE   : std_logic;
 -- flags and other data
   signal underflow_flag : std_logic;
@@ -256,14 +263,21 @@ IRQ            <= underflow_flag and not old_underflow;
     end if;      
   end process;
 
+  cntsync: process (PHI2,RES_N) is
+  begin
+    if rising_edge(PHI2) then
+      CNTSYNCED <= CNT;
+    end if;      
+  end process;
+
 
 -- TIMER CLOCK
   with CRB_INMODE select
-      TMRCLOCK <= PHI2                   when "00",
-                   CNT                    when "01",
-                   TMRA_UNDERFLOW         when "10",
-                   TMRA_UNDERFLOW and CNT when "11",
-                   '0' when others;
+      TMRCLOCK <= PHI2                         when "00",
+                  CNTSYNCED                    when "01",
+                  TMRA_UNDERFLOW               when "10",
+                  TMRA_UNDERFLOW and CNTSYNCED when "11",
+                  '0' when others;
 
 -- TIMER
   timerB: process (TMRCLOCK,RES_N,CRB_LOAD) is
