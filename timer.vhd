@@ -61,11 +61,12 @@ IRQ            <= underflow_flag and not old_underflow;
   begin
     if RES_N = '0' then
       TMRTOGGLE <= '0';
-    end if;
-    if rising_edge(phi2) and CRA_START = '1' and old_start = '0' then
-      TMRTOGGLE <= '1';
-    elsif rising_edge(underflow_flag) then
-      TMRTOGGLE <= not TMRTOGGLE;
+    elsif rising_edge(phi2) then
+      if CRA_START = '1' and old_start = '0' then
+        TMRTOGGLE <= '1';
+      elsif underflow_flag = '1' then
+        TMRTOGGLE <= not TMRTOGGLE;
+      end if;
     end if;
     old_start := CRA_START;
   end process;
@@ -247,11 +248,12 @@ IRQ            <= underflow_flag and not old_underflow;
   begin
     if RES_N = '0' then
       TMRTOGGLE <= '0';
-    end if;
-    if rising_edge(phi2) and CRB_START = '1' and old_start = '0' then
-      TMRTOGGLE <= '1'; -- timer just started, set toggle to 1
-    elsif rising_edge(underflow_flag) then
-      TMRTOGGLE <= not TMRTOGGLE;
+    elsif rising_edge(phi2) then
+      if CRB_START = '1' and old_start = '0' then
+        TMRTOGGLE <= '1';
+      elsif underflow_flag = '1' then
+        TMRTOGGLE <= not TMRTOGGLE;
+      end if;
     end if;
     old_start := CRB_START;
   end process;
