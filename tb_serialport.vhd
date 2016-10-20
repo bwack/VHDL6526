@@ -54,12 +54,15 @@ P_CNT_0: process
     wait for 11.3 us;
   end process P_CNT_0;
 
+  
   process
   begin
 -- simple start stop test
     res_n <= '0';
     Wr <= '0';
     Rd <= '0';
+    -- SP <= '1';
+    CRA_SPMODE <= '1';
     wait for HALFPERIOD*3;
     res_n <= '1';
     wait for HALFPERIOD*2*20;
