@@ -13,10 +13,13 @@ entity SerialPort is
     RES_N   : in  std_logic; -- global reset
     Rd, Wr  : in  std_logic; -- read and write registers
 -- INPUTS & OUTPUTS
-    CRA_SPMODE : in std_logic; -- input from CRA register
+    SPMODE  : in std_logic; -- input from CRA register
     IRQ_N   : out std_logic; -- interrupt after 8 cnt in input mode.
     SP      : inout std_logic;
-    CNT     : in std_logic -- in or out depending on input or output mode.
+    CNT     : in std_logic; -- CNT line input from external devices
+    TMRA_IN : in std_logic; -- input from TimerA.TMR_OUT, toggle mode.
+    CNT_OUT : out std_logic; -- output to CNT line. Controls tristate buffer.
+    CNT_OUT_EN : out std_logic
   );
 end entity;
 
@@ -32,22 +35,32 @@ architecture rtl of SerialPort is
   type state_t is (START, WAIT_CNT_FALLING, WAIT_CNT_RISING, DUMP_SHIFT_REGISTER);
   signal present_state, next_state : state_t;
   signal read_flag, write_flag, timed, dec, start_timer, dumpsr : std_logic;
+  signal sync_rst, SPMODE_old : std_logic;
+  signal SPMODE_delay : std_logic;
 --  signal cnt_pulse : std_logic;
 begin
-  SP <= SR_OUT when CRA_SPMODE = '1' else 'Z';
+  SP <= SR_OUT when SPMODE = '1' else 'Z';
+  CNT_OUT <= '1' when TMRA_IN = '1' and SPMODE_delay = '1' else '0';
+  CNT_OUT_EN <= '1' when timed = '0' and SPMODE_delay = '1' else '0';
   IRQ_N <= '0';
 
 -- synchronizing CNT and creating a pulses for the rising and falling edges.
   process(PHI2) is
   begin
     if rising_edge(PHI2) then
+       SPMODE_delay <= SPMODE;
+       sync_rst <= '0';
        CNT_rising  <= '0';
        CNT_falling <= '0';
        CNT_old <= CNT;
-       if CNT_old = '0' and CNT = '1' then
+       SPMODE_old <= SPMODE;
+       if CNT_old = '0' and ( CNT = '1' or CNT = 'H' ) then
          CNT_rising <= '1';
-       elsif CNT_old = '1' and CNT = '0' then
+       elsif (CNT_old = '1' or CNT_old = 'H') and CNT = '0' then
          CNT_falling <= '1';
+       end if;
+       if SPMODE_old = '1' xor SPMODE = '1' then
+         sync_rst <= '1';
        end if;
     end if;
   end process;
@@ -69,7 +82,7 @@ begin
   timeder: process(PHI2) is
     variable count : integer;
   begin
-    if RES_N = '0' then
+    if RES_N = '0' or sync_rst = '1' then
       count := 7;
       timed <= '1';
     elsif rising_edge(PHI2) then
@@ -91,11 +104,15 @@ begin
     if RES_N = '0' then
       present_state <= START;
     elsif rising_edge(PHI2) then
-      present_state <= next_state;
+      if sync_rst = '1' then
+        present_STATE <= START;
+      else
+        present_state <= next_state;
+      end if;
     end if;
   end process seq;
 
-  com: process(present_state,CRA_SPMODE,sdr_loaded,timed,CNT_falling,CNT_rising) is
+  com: process(present_state,SPMODE,sdr_loaded,timed,CNT_falling,CNT_rising) is
   begin
     loadsreg <= '0';
     shift_out <= '0';
@@ -107,7 +124,7 @@ begin
     case present_state is
 
       when START => 
-        if CRA_SPMODE = '1' then
+        if SPMODE = '1' then
           if sdr_loaded ='1' then
             next_state <= WAIT_CNT_FALLING;
             loadsreg <= '1';    -- mealy output
@@ -122,7 +139,7 @@ begin
 
       when WAIT_CNT_FALLING =>
         if timed = '1' then
-          if CRA_SPMODE = '1' then
+          if SPMODE = '1' then
             interrupt <= '1';
             next_state <= START;
           else
@@ -162,6 +179,7 @@ begin
   begin
     if RES_N = '0' then
       SR <= "00000000";
+      SR_OUT <= '0';
     elsif rising_edge(PHI2) then
       if shift_in = '1' then
         SR(0) <= SP;

@@ -16,11 +16,12 @@ entity timerA is
     Rd, Wr  : in  std_logic; -- read and write registers
 --  Rd and Wr are driven by CS_N and Rd/Wr in the chip access control
 -- INPUTS
-    CNT     : in  std_logic; -- counter
+    CNT     : in std_logic; -- counter
 -- OUTPUTS
     TMR_OUT        : out std_logic; -- timer A output to PORTB
     TMRA_UNDERFLOW : out std_logic; -- timer A underflow pulses for timer B.
     PB_ON_EN       : out std_logic; -- enable timer A output on PB6 else PB6 is I/O
+    SPMODE         : out std_logic;
     IRQ            : out std_logic
   );
 end entity timerA;
@@ -54,17 +55,21 @@ TMR_OUT        <= (underflow_flag and not old_underflow) when CRA_OUTMODE = '0'
                   else TMRTOGGLE;
 TMRA_UNDERFLOW <= underflow_flag and not old_underflow;
 PB_ON_EN       <= CRA_PBON;
+--CNT            <= TMRTOGGLE when CRA_SPMODE = '1' and TMRTOGGLE = '0' else 'H';
 IRQ            <= underflow_flag and not old_underflow;
+SPMODE         <= CRA_SPMODE;
 
-  timertoggle: process(PHI2,RES_N,underflow_flag)
+  timertoggle: process(PHI2,RES_N,CRA_START,underflow_flag)
     variable old_start : std_logic ;
   begin
     if RES_N = '0' then
       TMRTOGGLE <= '0';
+    elsif CRA_START = '1' and old_start = '0' then
+      TMRTOGGLE <= '1';
     elsif rising_edge(phi2) then
-      if CRA_START = '1' and old_start = '0' then
-        TMRTOGGLE <= '1';
-      elsif underflow_flag = '1' then
+--      if CRA_START = '1' and old_start = '0' then
+--        TMRTOGGLE <= '1';
+      if underflow_flag = '1' then
         TMRTOGGLE <= not TMRTOGGLE;
       end if;
     end if;
