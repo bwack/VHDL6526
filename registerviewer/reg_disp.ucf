@@ -1,0 +1,78 @@
+
+
+NET "a_n[3]" IOSTANDARD = LVCMOS33;
+NET "a_n[2]" IOSTANDARD = LVCMOS33;
+NET "a_n[1]" IOSTANDARD = LVCMOS33;
+NET "a_n[0]" IOSTANDARD = LVCMOS33;
+NET "abcdefgdec_n[7]" IOSTANDARD = LVCMOS33;
+NET "abcdefgdec_n[6]" IOSTANDARD = LVCMOS33;
+NET "abcdefgdec_n[5]" IOSTANDARD = LVCMOS33;
+NET "abcdefgdec_n[4]" IOSTANDARD = LVCMOS33;
+NET "abcdefgdec_n[3]" IOSTANDARD = LVCMOS33;
+NET "abcdefgdec_n[2]" IOSTANDARD = LVCMOS33;
+NET "abcdefgdec_n[1]" IOSTANDARD = LVCMOS33;
+NET "abcdefgdec_n[0]" IOSTANDARD = LVCMOS33;
+NET "data[7]" IOSTANDARD = LVCMOS33;
+NET "data[6]" IOSTANDARD = LVCMOS33;
+NET "data[5]" IOSTANDARD = LVCMOS33;
+NET "data[4]" IOSTANDARD = LVCMOS33;
+NET "data[3]" IOSTANDARD = LVCMOS33;
+NET "data[2]" IOSTANDARD = LVCMOS33;
+NET "data[1]" IOSTANDARD = LVCMOS33;
+NET "data[0]" IOSTANDARD = LVCMOS33;
+NET "dispreg[3]" IOSTANDARD = LVCMOS33;
+NET "dispreg[2]" IOSTANDARD = LVCMOS33;
+NET "dispreg[1]" IOSTANDARD = LVCMOS33;
+NET "dispreg[0]" IOSTANDARD = LVCMOS33;
+NET "rs[3]" IOSTANDARD = LVCMOS33;
+NET "rs[2]" IOSTANDARD = LVCMOS33;
+NET "rs[1]" IOSTANDARD = LVCMOS33;
+NET "rs[0]" IOSTANDARD = LVCMOS33;
+NET "cs_n" IOSTANDARD = LVCMOS33;
+NET "PHI2" IOSTANDARD = LVCMOS33;
+NET "RES_N" IOSTANDARD = LVCMOS33;
+NET "rw" IOSTANDARD = LVCMOS33;
+
+
+NET "a_n[3]" LOC = F15;
+NET "a_n[2]" LOC = C18;
+NET "a_n[1]" LOC = H17;
+NET "a_n[0]" LOC = F17;
+NET "abcdefgdec_n[7]" LOC = L18;
+NET "abcdefgdec_n[6]" LOC = F18;
+NET "abcdefgdec_n[5]" LOC = D17;
+NET "abcdefgdec_n[4]" LOC = D16;
+NET "abcdefgdec_n[3]" LOC = G14;
+NET "abcdefgdec_n[2]" LOC = J17;
+NET "abcdefgdec_n[1]" LOC = H14;
+NET "abcdefgdec_n[0]" LOC = C17;
+NET "PHI2" LOC = L15;
+
+
+NET "RES_N" LOC = K12;
+
+
+NET "dispreg[0]" LOC = G18;
+NET "dispreg[1]" LOC = H18;
+NET "dispreg[2]" LOC = K18;
+NET "dispreg[3]" LOC = K17;
+NET "data[0]" LOC = M13;
+NET "data[1]" LOC = R18;
+NET "data[2]" LOC = R15;
+NET "data[3]" LOC = T17;
+NET "data[4]" LOC = P17;
+NET "data[5]" LOC = R16;
+NET "data[6]" LOC = T18;
+NET "data[7]" LOC = U18;
+NET "rs[3]" LOC = M16;
+NET "rs[2]" LOC = M14;
+NET "rs[1]" LOC = L16;
+NET "rs[0]" LOC = K13;
+NET "cs_n" LOC = M15;
+NET "rw" LOC = L17;
+
+NET "PHI2" CLOCK_DEDICATED_ROUTE = FALSE;
+#Created by Constraints Editor (xc3s500e-fg320-4) - 2016/10/23
+NET "PHI2" TNM_NET = "PHI2";
+TIMESPEC TS_PHI2 = PERIOD "PHI2" 1000 ns HIGH 50 %;
+
