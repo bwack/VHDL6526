@@ -1,7 +1,6 @@
 library ieee;
 use ieee.std_logic_1164.all;
-use ieee.std_logic_arith.all;
-use ieee.std_logic_unsigned.all;
+use IEEE.numeric_std.ALL;
 
 entity timerA is
 -- Interval Timer: 16 bit read-only Timer Counter
@@ -22,7 +21,7 @@ entity timerA is
     TMRA_UNDERFLOW : out std_logic; -- timer A underflow pulses for timer B.
     PB_ON_EN       : out std_logic; -- enable timer A output on PB6 else PB6 is I/O
     SPMODE         : out std_logic;
-    IRQ            : out std_logic
+    INT            : out std_logic
   );
 end entity timerA;
 
@@ -56,7 +55,7 @@ TMR_OUT        <= (underflow_flag and not old_underflow) when CRA_OUTMODE = '0'
 TMRA_UNDERFLOW <= underflow_flag and not old_underflow;
 PB_ON_EN       <= CRA_PBON;
 --CNT            <= TMRTOGGLE when CRA_SPMODE = '1' and TMRTOGGLE = '0' else 'H';
-IRQ            <= underflow_flag and not old_underflow;
+INT            <= underflow_flag and not old_underflow;
 SPMODE         <= CRA_SPMODE;
 
   timertoggle: process(PHI2,RES_N,CRA_START,underflow_flag)
@@ -67,8 +66,6 @@ SPMODE         <= CRA_SPMODE;
     elsif CRA_START = '1' and old_start = '0' then
       TMRTOGGLE <= '1';
     elsif rising_edge(phi2) then
---      if CRA_START = '1' and old_start = '0' then
---        TMRTOGGLE <= '1';
       if underflow_flag = '1' then
         TMRTOGGLE <= not TMRTOGGLE;
       end if;
@@ -108,7 +105,7 @@ SPMODE         <= CRA_SPMODE;
         underflow_flag <= '1';
         TMRA <= TA_HI & TA_LO;
       elsif CRA_START = '1' then
-          TMRA <= TMRA - 1;
+          TMRA <= std_logic_vector(unsigned(TMRA) - 1);
       end if;
     end if;
   end process timerA;
@@ -188,8 +185,7 @@ end architecture;
 
 library ieee;
 use ieee.std_logic_1164.all;
-use ieee.std_logic_arith.all;
-use ieee.std_logic_unsigned.all;
+use IEEE.numeric_std.ALL;
 
 entity timerB is
 -- Interval Timer: 16 bit read-only Timer Counter
@@ -300,7 +296,7 @@ IRQ            <= underflow_flag and not old_underflow;
         underflow_flag <= '1';
         TMRB <= TB_HI & TB_LO;
       elsif CRB_START = '1' then
-          TMRB <= TMRB - 1;
+          TMRB <= std_logic_vector(unsigned(TMRB) - 1);
       end if;
     end if;
   end process timerB;

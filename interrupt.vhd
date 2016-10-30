@@ -13,14 +13,14 @@ entity interrupt is
     RES_N   : in  std_logic; -- global reset
     Rd, Wr  : in  std_logic; -- read and write registers
 -- INPUTS
-    INTIN  : in std_logic_vector(4 downto 0);
---    INT_TMRA       : in std_logic;
---    INT_TMRB       : in std_logic;
---    INT_TODALARM   : in std_logic;
---    INT_SERIALPORT : in std_logic;
---    INT_FLAG       : in std_logic;
+--    INTIN  : in std_logic_vector(4 downto 0);
+    INT_TMRA       : in std_logic; -- bit 0
+    INT_TMRB       : in std_logic; -- bit 1
+    INT_TODALARM   : in std_logic; -- bit 2
+    INT_SP         : in std_logic; -- bit 3
+    INT_FLAG       : in std_logic; -- bit 4
 -- OUTPUTS
-    IRQ_N          : out std_logic
+    IRQ            : out std_logic
   );
 end entity interrupt;
 
@@ -32,8 +32,8 @@ architecture rtl of interrupt is
   signal ICR_READ_FLAG : std_logic; 
 begin
 
--- Interrupt registers
-  process(PHI2,INTIN,ICR_READ_FLAG,RES_N) is
+-- Interrupt registers, write
+  process(PHI2,ICR_READ_FLAG,RES_N) is
     variable IR : std_logic;
   begin
     IR := '0';
@@ -50,12 +50,21 @@ begin
           ICR_MASK_L <= not(DI) and ICR_MASK_L;
         end if;
       end if;
-      for i in 0 to 4 loop
-        if INTIN(i) = '1' and ICR_MASK_L(i) = '1' then
-          ICR_DATA_L(i) <= '1';
-          IR := '1';
-        end if;
-      end loop;
+      if ICR_MASK_L(0) = '1' and INT_TMRA = '1' then
+        ICR_DATA_L(0) <= '1'; IR := '1';
+      end if;
+      if ICR_MASK_L(1) = '1' and INT_TMRB = '1' then
+        ICR_DATA_L(1) <= '1'; IR := '1';
+      end if;
+      if ICR_MASK_L(2) = '1' and INT_TODALARM = '1' then
+        ICR_DATA_L(2) <= '1'; IR := '1';
+      end if;
+      if ICR_MASK_L(3) = '1' and INT_SP = '1' then
+        ICR_DATA_L(3) <= '1'; IR := '1';
+      end if;
+      if ICR_MASK_L(4) = '1' and INT_FLAG = '1' then
+        ICR_DATA_L(4) <= '1'; IR := '1';
+      end if;
       if IR = '1' or ICR_DATA_L(4 downto 0) > "00000"  then
          ICR_DATA_L(7) <= '1'; -- data latch has interrupts
       else
@@ -65,7 +74,7 @@ begin
   end process;
 
 -- IRQ_N
-  IRQ_N <= not ICR_DATA_L(7);
+  IRQ <= ICR_DATA_L(7);
 
 -- WRITE REGISTERS
 --  process (PHI2,RES_N) is

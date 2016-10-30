@@ -1,6 +1,5 @@
 library ieee;
 use ieee.std_logic_1164.all;
-use ieee.std_logic_arith.all;
 use IEEE.numeric_std.ALL;
 
 entity SerialPort is
@@ -14,7 +13,7 @@ entity SerialPort is
     Rd, Wr  : in  std_logic; -- read and write registers
 -- INPUTS & OUTPUTS
     SPMODE  : in std_logic; -- input from CRA register
-    IRQ_N   : out std_logic; -- interrupt after 8 cnt in input mode.
+    INT     : out std_logic; -- interrupt after 8 cnt.
     SP      : inout std_logic;
     CNT     : in std_logic; -- CNT line input from external devices
     TMRA_IN : in std_logic; -- input from TimerA.TMR_OUT, toggle mode.
@@ -42,7 +41,7 @@ begin
   SP <= SR_OUT when SPMODE = '1' else 'Z';
   CNT_OUT <= '1' when TMRA_IN = '1' and SPMODE_delay = '1' else '0';
   CNT_OUT_EN <= '1' when timed = '0' and SPMODE_delay = '1' else '0';
-  IRQ_N <= '0';
+  INT <= interrupt;
 
 -- synchronizing CNT and creating a pulses for the rising and falling edges.
   process(PHI2) is
@@ -86,6 +85,7 @@ begin
       count := 7;
       timed <= '1';
     elsif rising_edge(PHI2) then
+      interrupt <= '0';
       if start_timer = '1' then
          count := 7;
          timed <= '0';
@@ -94,6 +94,7 @@ begin
           count := count - 1;
         else
           timed <= '1';
+          interrupt <= '1';
         end if;
       end if;
     end if;
@@ -119,7 +120,7 @@ begin
     shift_in  <= '0';
     dec <= '0';
     start_timer <= '0';
-    interrupt <= '0';
+--    interrupt <= '0';
     dumpsr <= '0';
     case present_state is
 
@@ -140,7 +141,7 @@ begin
       when WAIT_CNT_FALLING =>
         if timed = '1' then
           if SPMODE = '1' then
-            interrupt <= '1';
+--            interrupt <= '1';
             next_state <= START;
           else
             next_state <= DUMP_SHIFT_REGISTER;
@@ -169,7 +170,7 @@ begin
 
       when DUMP_SHIFT_REGISTER =>
         dumpsr <= '1';
-        interrupt <= '1';
+--        interrupt <= '1';
         next_state <= START;
 
     end case;    

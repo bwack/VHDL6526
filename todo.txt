@@ -1,4 +1,5 @@
-timer works very well now in all modes. What remains is the SPMODE.
-In SPMODE, timerA underflows is a baud rate generator for the serial
-port entity using the CNT signal as output.
-When that is working one can simulate the serialport together with timera.
+Serial POrt and TimerA simulates well together.
+Remember to make the top level set up the IOBUFSand let
+TimerA or SP control them.
+
+TOD needs alarm regs and interrupt on alarm
