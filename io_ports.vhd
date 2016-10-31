@@ -98,7 +98,7 @@ entity port_b is
     TMRB_PB_ON     : in std_logic; -- puts TMRB_OUT on PB, overrides bit in DDRB.
     PC_N           : out std_logic -- Goes low for one clock cycle following
                                     -- a read or write of PORT B.
-     );
+   );
 end entity port_b;
 
 architecture rtlb of port_b is
