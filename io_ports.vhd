@@ -92,8 +92,8 @@ entity port_b is
 -- I/O
     PB_BUF_IN      : inout std_logic_vector(7 downto 0);
     PB_BUF_OUT     : inout std_logic_vector(7 downto 0);
-    TMRA_OUT       : in std_logic; -- from TMRA to PB6 if TMRA_PB_ON = '1'
-    TMRB_OUT       : in std_logic; -- from TMRB to PB7 if TMRB_PB_ON = '1'
+    TMRA_PB_IN     : in std_logic; -- from TMRA to PB6 if TMRA_PB_ON = '1'
+    TMRB_PB_IN     : in std_logic; -- from TMRB to PB7 if TMRB_PB_ON = '1'
     TMRA_PB_ON     : in std_logic; -- puts TMRA_OUT on PB, overrides bit in DDRB.
     TMRB_PB_ON     : in std_logic; -- puts TMRB_OUT on PB, overrides bit in DDRB.
     PC_N           : out std_logic -- Goes low for one clock cycle following
@@ -118,8 +118,8 @@ begin
   PB_BUF_OUT(5) <= PRB(5) when DDRB(5) = '1' else 'H';
   PB_BUF_OUT(6) <= PRB(6) when DDRB(6) = '1' and TMRA_PB_ON = '0' else 'H';
   PB_BUF_OUT(7) <= PRB(7) when DDRB(7) = '1' and TMRB_PB_ON = '0' else 'H';
-  PB_BUF_OUT(6) <= TMRA_PB when TMRA_PB_ON = '1' else 'H';
-  PB_BUF_OUT(7) <= TMRB_PB when TMRB_PB_ON = '1' else 'H';
+  PB_BUF_OUT(6) <= TMRA_PB_IN when TMRA_PB_ON = '1' else 'H';
+  PB_BUF_OUT(7) <= TMRB_PB_IN when TMRB_PB_ON = '1' else 'H';
   PB_BUF_IN <= PB_BUF_OUT;
   DO   <= data when  reg_read_flag = '1' else (others => 'Z');
   PC_N <= '0'  when port_read_flag = '1' or port_write_flag = '1' else '1';

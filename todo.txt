@@ -1,2 +1,2 @@
-Alarm regs and interrupt on alarm works.
 continue on top-level str.
+make testbench with cpuprocedures.

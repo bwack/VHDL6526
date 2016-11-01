@@ -17,7 +17,7 @@ entity timeofday is
     CRB_ALARM : in std_logic; -- Writing to TOD registers: 1=sets ALARM, 0=sets time
     INT       : out std_logic -- interrupt on alarm
   );
-end entity tod;
+end entity timeofday;
 
 architecture rtl of timeofday is
 -- Please excuse the daft code. These are BCD formatted.

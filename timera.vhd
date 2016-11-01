@@ -17,8 +17,8 @@ entity timerA is
 -- INPUTS
     CNT     : in std_logic; -- counter
 -- OUTPUTS
-    TMR_OUT        : out std_logic; -- timer A output to PORTB
     TMRA_UNDERFLOW : out std_logic; -- timer A underflow pulses for timer B.
+    TMR_OUT        : out std_logic; -- timer A output to PORTB
     PB_ON_EN       : out std_logic; -- enable timer A output on PB6 else PB6 is I/O
     SPMODE         : out std_logic; -- CRA_SPMODE forwarding to serial port
     TODIN          : out std_logic; -- CRA_TODIN forwarding to tod

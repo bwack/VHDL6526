@@ -12,13 +12,13 @@ entity SerialPort is
     RES_N   : in  std_logic; -- global reset
     Rd, Wr  : in  std_logic; -- read and write registers
 -- INPUTS & OUTPUTS
+    CNT     : in std_logic; -- CNT line input from external devices
+    CNT_OUT : out std_logic; -- output to CNT line. Controls tristate buffer.
+    CNT_OUT_EN : out std_logic;
     SPMODE  : in std_logic; -- input from CRA register
     INT     : out std_logic; -- interrupt after 8 cnt.
     SP      : inout std_logic;
-    CNT     : in std_logic; -- CNT line input from external devices
-    TMRA_IN : in std_logic; -- input from TimerA.TMR_OUT, toggle mode.
-    CNT_OUT : out std_logic; -- output to CNT line. Controls tristate buffer.
-    CNT_OUT_EN : out std_logic
+    TMRA_IN : in std_logic -- input from TimerA.TMR_OUT, toggle mode.
   );
 end entity;
 
