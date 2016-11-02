@@ -7,8 +7,7 @@ entity port_a is
   port (
 -- DATA AND CONTROL
     PHI2    : in  std_logic; -- clock 1MHz
-    DI      : in  std_logic_vector(7 downto 0); -- data in
-    DO      : out std_logic_vector(7 downto 0); -- data out
+    DB      : inout std_logic_vector(7 downto 0); -- data in
     RS      : in  std_logic_vector(3 downto 0); -- register select
     RES_N   : in  std_logic; -- global reset
     Rd, Wr  : in  std_logic; -- read and write registers
@@ -20,6 +19,7 @@ entity port_a is
 end entity port_a;
 
 architecture rtla of port_a is
+  signal DI, DO      : std_logic_vector(7 downto 0);
 -- REGISTERS 
   signal PRA  : std_logic_vector(7 downto 0); -- PA0-PA7 Peripheral Data Register
   signal DDRA : std_logic_vector(7 downto 0); -- data direction of PA0-PA7 (1=out)
@@ -33,6 +33,8 @@ begin
   end generate BUFFERBITS;
   PA_BUF_IN <= PA_BUF_OUT;
   DO   <= data when read_flag  = '1' else (others => 'Z');
+  DB <= DO when read_flag = '1' else "ZZZZZZZZ";
+  DI <= DB;
 
 --  PA_tris <= DDRA;
 -- WRITE REGISTERS
@@ -41,7 +43,7 @@ begin
     if RES_N = '0' then
       PRA <= x"00";
       DDRA <= x"00";
-    elsif rising_edge(PHI2) then
+    elsif falling_edge(PHI2) then
       if Wr = '1' then
         case RS is
           when x"0" => PRA <= DI;
@@ -84,8 +86,7 @@ entity port_b is
   port (
 -- DATA AND CONTROL
     PHI2    : in  std_logic; -- clock 1MHz
-    DI      : in  std_logic_vector(7 downto 0); -- data in
-    DO      : out std_logic_vector(7 downto 0); -- data out
+    DB      : inout std_logic_vector(7 downto 0); -- data in
     RS      : in  std_logic_vector(3 downto 0); -- register select
     RES_N   : in  std_logic; -- global reset
     Rd, Wr  : in  std_logic; -- read and write registers
@@ -102,6 +103,7 @@ entity port_b is
 end entity port_b;
 
 architecture rtlb of port_b is
+  signal DI, DO      : std_logic_vector(7 downto 0);
 -- REGISTERS 
   signal PRB : std_logic_vector(7 downto 0); -- PB0-PB7 Peripheral Data Register
   signal DDRB : std_logic_vector(7 downto 0); -- data direction of PB0-PB7 (1=out)
@@ -124,13 +126,17 @@ begin
   DO   <= data when  reg_read_flag = '1' else (others => 'Z');
   PC_N <= '0'  when port_read_flag = '1' or port_write_flag = '1' else '1';
 
+  DB <= DO when reg_read_flag = '1' else "ZZZZZZZZ";
+  DI <= DB;
+
+
 -- WRITE REGISTERS
   process (PHI2,RES_N) is
   begin
     if RES_N = '0' then
       PRB <= x"00";
       DDRB <= x"00";
-    elsif rising_edge(PHI2) then
+    elsif falling_edge(PHI2) then
       port_write_flag <= '0';
       reg_write_flag <= '0';
       if Wr = '1' then
@@ -153,7 +159,6 @@ begin
       reg_read_flag <= '0';
       if Rd = '1' then
         case RS is
---        when x"1" => data <= PRB;  read_flag <= '1';
           when x"1" => data <= PB_BUF_IN; reg_read_flag <= '1'; port_read_flag <= '1';
           when x"3" => data <= DDRB;      reg_read_flag <= '1';
           when others => null;

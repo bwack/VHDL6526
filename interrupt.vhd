@@ -7,8 +7,7 @@ entity interrupt is
   port (
 -- DATA AND CONTROL
     PHI2    : in  std_logic; -- clock 1MHz
-    DI      : in  std_logic_vector(7 downto 0); -- data in
-    DO      : out std_logic_vector(7 downto 0); -- data out
+    DB      : inout std_logic_vector(7 downto 0); -- data in
     RS      : in  std_logic_vector(3 downto 0); -- register select
     RES_N   : in  std_logic; -- global reset
     Rd, Wr  : in  std_logic; -- read and write registers
@@ -25,6 +24,7 @@ entity interrupt is
 end entity interrupt;
 
 architecture rtl of interrupt is
+  signal DI, DO      : std_logic_vector(7 downto 0);
 -- REGISTERS (Interrupt Control Register - x"D")
   signal ICR_DATA_L : std_logic_vector(7 downto 0); -- read only data latch
   signal ICR_MASK_L : std_logic_vector(7 downto 0); -- write only interrupt mask
@@ -32,10 +32,14 @@ architecture rtl of interrupt is
   signal ICR_READ_FLAG : std_logic; 
 begin
 
+  DB <= DO when ICR_READ_FLAG = '1' else "ZZZZZZZZ";
+  DI <= DB;
+
 -- Interrupt registers, write
   process(PHI2,ICR_READ_FLAG,RES_N) is
     variable IR : std_logic;
   begin
+
     IR := '0';
     if RES_N = '0' then
       ICR_DATA_L <= "00000000";
@@ -95,12 +99,13 @@ begin
 -- READ REGISTER
   process (PHI2) is
   begin
-    if rising_edge(PHI2) then
-      if Rd = '1' and RES_N = '1' then
+    if falling_edge(PHI2) then
+      ICR_READ_FLAG <= '0';
+      if RES_N = '0' then
+
+      elsif Rd = '1' and RS = x"D" then
         DO <= ICR_DATA_L(7) & '0' & '0' & ICR_DATA_L(4 downto 0);
         ICR_READ_FLAG <= '1';
-      else
-        ICR_READ_FLAG <= '0';
       end if;
     end if;
   end process;

@@ -6,8 +6,7 @@ entity timeofday is
   port ( 
 -- DATA AND CONTROL
     PHI2    : in  std_logic; -- clock 1MHz
-    DI      : in  std_logic_vector(7 downto 0); -- databus
-    DO      : out std_logic_vector(7 downto 0); -- databus
+    DB      : inout std_logic_vector(7 downto 0); -- data in
     RS      : in  std_logic_vector(3 downto 0); -- address - register select
     RES_N   : in  std_logic; -- global reset
     Rd, Wr  : in  std_logic; -- read and write registers
@@ -20,6 +19,7 @@ entity timeofday is
 end entity timeofday;
 
 architecture rtl of timeofday is
+  signal DI, DO      : std_logic_vector(7 downto 0);
 -- Please excuse the daft code. These are BCD formatted.
   signal THS, A_THS : unsigned(3 downto 0); -- Tenths of seconds
   signal SH,  A_SH  : unsigned(2 downto 0); -- Seconds, high bits
@@ -38,6 +38,9 @@ architecture rtl of timeofday is
 begin
 
   alarm <= '1' when THS=A_THS and SH=A_SH and SL=A_SL and MH=A_MH and ML=A_ML and HH=A_HH and HL=A_HL and PM=A_PM else '0';
+  DB <= DO when read_flag = '1' else "ZZZZZZZZ";
+  DI <= DB;
+
   interruptgen: process(PHI2)
   begin
     if rising_edge(PHI2) then

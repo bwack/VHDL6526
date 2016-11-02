@@ -30,8 +30,7 @@ architecture str of cia is
   port ( 
 -- DATA AND CONTROL
     PHI2    : in  std_logic; -- clock 1MHz
-    DI      : in  std_logic_vector(7 downto 0); -- databus
-    DO      : out std_logic_vector(7 downto 0); -- databus
+    DB      : inout std_logic_vector(7 downto 0); -- databus
     RS      : in  std_logic_vector(3 downto 0); -- address - register select
     RES_N   : in  std_logic; -- global reset
     Rd, Wr  : in  std_logic; -- read and write registers
@@ -39,8 +38,8 @@ architecture str of cia is
 -- INPUTS
     CNT     : in std_logic; -- counter
 -- OUTPUTS
-    TMR_OUT        : out std_logic; -- timer A output to PORTB
     TMRA_UNDERFLOW : out std_logic; -- timer A underflow pulses for timer B.
+    TMR_OUT        : out std_logic; -- timer A output to PORTB
     PB_ON_EN       : out std_logic; -- enable timer A output on PB6 else PB6 is I/O
     SPMODE         : out std_logic; -- CRA_SPMODE forwarding to serial port
     TODIN          : out std_logic; -- CRA_TODIN forwarding to tod
@@ -52,8 +51,7 @@ architecture str of cia is
   port ( 
 -- DATA AND CONTROL
     PHI2    : in  std_logic; -- clock 1MHz
-    DI      : in  std_logic_vector(7 downto 0); -- databus
-    DO      : out std_logic_vector(7 downto 0); -- databus
+    DB      : inout  std_logic_vector(7 downto 0); -- databus
     RS      : in  std_logic_vector(3 downto 0); -- address - register select
     RES_N   : in  std_logic; -- global reset
     Rd, Wr  : in  std_logic; -- read and write registers
@@ -72,8 +70,7 @@ architecture str of cia is
   port (
 -- DATA AND CONTROL
     PHI2    : in  std_logic; -- clock 1MHz
-    DI      : in  std_logic_vector(7 downto 0); -- data in
-    DO      : out std_logic_vector(7 downto 0); -- data out
+    DB      : inout std_logic_vector(7 downto 0); -- data in
     RS      : in  std_logic_vector(3 downto 0); -- register select
     RES_N   : in  std_logic; -- global reset
     Rd, Wr  : in  std_logic; -- read and write registers
@@ -88,8 +85,7 @@ architecture str of cia is
   port (
 -- DATA AND CONTROL
     PHI2    : in  std_logic; -- clock 1MHz
-    DI      : in  std_logic_vector(7 downto 0); -- data in
-    DO      : out std_logic_vector(7 downto 0); -- data out
+    DB      : inout std_logic_vector(7 downto 0); -- data in
     RS      : in  std_logic_vector(3 downto 0); -- register select
     RES_N   : in  std_logic; -- global reset
     Rd, Wr  : in  std_logic; -- read and write registers
@@ -109,8 +105,7 @@ architecture str of cia is
   port (
 -- DATA AND CONTROL
     PHI2    : in  std_logic; -- clock 1MHz
-    DI      : in  std_logic_vector(7 downto 0); -- data in
-    DO      : out std_logic_vector(7 downto 0); -- data out
+    DB      : inout std_logic_vector(7 downto 0); -- data in
     RS      : in  std_logic_vector(3 downto 0); -- register select
     RES_N   : in  std_logic; -- global reset
     Rd, Wr  : in  std_logic; -- read and write registers
@@ -129,8 +124,7 @@ architecture str of cia is
   port (
 -- DATA AND CONTROL
     PHI2    : in  std_logic; -- clock 1MHz
-    DI      : in  std_logic_vector(7 downto 0); -- data in
-    DO      : out std_logic_vector(7 downto 0); -- data out
+    DB      : inout std_logic_vector(7 downto 0); -- data in
     RS      : in  std_logic_vector(3 downto 0); -- register select
     RES_N   : in  std_logic; -- global reset
     Rd, Wr  : in  std_logic; -- read and write registers
@@ -150,8 +144,7 @@ architecture str of cia is
   port ( 
 -- DATA AND CONTROL
     PHI2    : in  std_logic; -- clock 1MHz
-    DI      : in  std_logic_vector(7 downto 0); -- databus
-    DO      : out std_logic_vector(7 downto 0); -- databus
+    DB      : inout std_logic_vector(7 downto 0); -- data in
     RS      : in  std_logic_vector(3 downto 0); -- address - register select
     RES_N   : in  std_logic; -- global reset
     Rd, Wr  : in  std_logic; -- read and write registers
@@ -164,12 +157,11 @@ architecture str of cia is
   end component timeofday;
 
   signal Rd, Wr : std_logic;
-  signal DI_TMRA, DI_TMRB, DI_PORTA, DI_PORTB, DI_SP, DI_INT, DI_TOD : std_logic_vector(7 downto 0);
-  signal DO_TMRA, DO_TMRB, DO_PORTA, DO_PORTB, DO_SP, DO_INT, DO_TOD : std_logic_vector(7 downto 0);
   signal CNT_OUT_i, CNT_OUT_EN_i, TMRA_OUT_i, TMRB_OUT_i  : std_logic;
   signal TMRA_UNDERFLOW_i, TMRA_PB_ON_i, TMRB_PB_ON_i, SPMODE_i : std_logic;
   signal TODIN_i, ALARM_i : std_logic;
-  signal INT_TMRA_i, INT_TMRB_i, INT_TODALARM_i, INT_SP_i, INT_FLAG_i : std_logic;
+  signal INT_TMRA_i, INT_TMRB_i, INT_TODALARM_i, INT_SP_i : std_logic;
+  signal INT_FLAG_i, IRQ_i : std_logic;
 
 begin
   Rd <=     RW and not CS_N;
@@ -177,50 +169,53 @@ begin
 
   TIMERA_0: entity work.timera
   port map (
-    PHI2=>PHI2, DI=>DI_TMRA, DO=>DO_TMRA, RS=>RS, RES_N=>RES_N, Rd=>Rd, Wr=>Wr,
+    PHI2=>PHI2, DB=>DB, RS=>RS, RES_N=>RES_N, Rd=>Rd, Wr=>Wr,
     CNT=>CNT, TMRA_UNDERFLOW=>TMRA_UNDERFLOW_i, TMR_OUT=>TMRA_OUT_i,
     PB_ON_EN=>TMRA_PB_ON_i, SPMODE=>SPMODE_i, TODIN=>TODIN_i, INT=>INT_TMRA_i
   );
 
   TIMERB_0: entity work.timerb
   port map (
-    PHI2=>PHI2, DI=>DI_TMRB, DO=>DO_TMRB, RS=>RS, RES_N=>RES_N, Rd=>Rd, Wr=>Wr,
+    PHI2=>PHI2, DB=>DB, RS=>RS, RES_N=>RES_N, Rd=>Rd, Wr=>Wr,
     CNT=>CNT, TMRA_UNDERFLOW=>TMRA_UNDERFLOW_i, TMR_OUT=>TMRB_OUT_i,
     PB_ON_EN=>TMRB_PB_ON_i, ALARM=>ALARM_i, INT=>INT_TMRB_i
   );
-
+ 
   PORTA_0: entity work.port_a
   port map (
-    PHI2=>PHI2, DI=>DI_PORTA, DO=>DO_PORTA, RS=>RS, RES_N=>RES_N, Rd=>Rd, Wr=>Wr,
+    PHI2=>PHI2, DB=>DB, RS=>RS, RES_N=>RES_N, Rd=>Rd, Wr=>Wr,
     PA_BUF_IN=>PA, PA_BUF_OUT=>PA
   );
-
+ 
   PORTB_0: entity work.port_b
   port map (
-    PHI2=>PHI2, DI=>DI_PORTB, DO=>DO_PORTB, RS=>RS, RES_N=>RES_N, Rd=>Rd, Wr=>Wr,
+    PHI2=>PHI2, DB=>DB, RS=>RS, RES_N=>RES_N, Rd=>Rd, Wr=>Wr,
     PB_BUF_IN=>PB, PB_BUF_OUT=>PB,
     TMRA_PB_IN=>TMRA_OUT_i, TMRB_PB_IN=>TMRB_OUT_i,
     TMRA_PB_ON=>TMRA_PB_ON_i, TMRB_PB_ON=>TMRB_PB_ON_i, PC_N=>PC_N
   );
-
+ 
   SERIALPORT_0: entity work.serialport
   port map (
-    PHI2=>PHI2, DI=>DI_SP, DO=>DO_SP, RS=>RS, RES_N=>RES_N, Rd=>Rd, Wr=>Wr,
+    PHI2=>PHI2, DB=>DB, RS=>RS, RES_N=>RES_N, Rd=>Rd, Wr=>Wr,
     CNT=>CNT, CNT_OUT=>CNT_OUT_i, CNT_OUT_EN=>CNT_OUT_EN_i, SPMODE=>SPMODE_i,
     INT=>INT_SP_i, SP=>SP, TMRA_IN=>TMRA_OUT_i
   );
   CNT <= CNT_OUT_i when CNT_OUT_EN_i = '1' else 'Z';
-
+ 
   INTERRUPT_0: entity work.interrupt
   port map (
-    PHI2=>PHI2, DI=>DI_INT, DO=>DO_INT, RS=>RS, RES_N=>RES_N, Rd=>Rd, Wr=>Wr,
+    PHI2=>PHI2, DB=>DB, RS=>RS, RES_N=>RES_N, Rd=>Rd, Wr=>Wr,
     INT_TMRA=>INT_TMRA_i, INT_TMRB=>INT_TMRB_i, INT_TODALARM=>INT_TODALARM_i,
-    INT_SP=>INT_SP_i, INT_FLAG=>INT_FLAG_i
+    INT_SP=>INT_SP_i, INT_FLAG=>INT_FLAG_i, IRQ=>IRQ_i
   );
   INT_FLAG_i <= FLAG_N;
-
+  IRQ_N <= not IRQ_i;
+ 
   TIMEOFDAY_0: entity work.timeofday
   port map (
-    PHI2=>PHI2, DI=>DI_TOD, DO=>DO_TOD, RS=>RS, RES_N=>RES_N, Rd=>Rd, Wr=>Wr,
+    PHI2=>PHI2, DB=>DB, RS=>RS, RES_N=>RES_N, Rd=>Rd, Wr=>Wr,
+    TODIN=>TOD, CRA_TODIN=>TODIN_i, CRB_ALARM=>ALARM_i, INT=>INT_TODALARM_i
   );
+
 end architecture str;

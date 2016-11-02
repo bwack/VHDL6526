@@ -6,8 +6,7 @@ entity SerialPort is
   port (
 -- DATA AND CONTROL
     PHI2    : in  std_logic; -- clock 1MHz
-    DI      : in  std_logic_vector(7 downto 0); -- data in
-    DO      : out std_logic_vector(7 downto 0); -- data out
+    DB      : inout std_logic_vector(7 downto 0); -- data in
     RS      : in  std_logic_vector(3 downto 0); -- register select
     RES_N   : in  std_logic; -- global reset
     Rd, Wr  : in  std_logic; -- read and write registers
@@ -23,6 +22,7 @@ entity SerialPort is
 end entity;
 
 architecture rtl of SerialPort is
+  signal DI, DO      : std_logic_vector(7 downto 0);
 -- REGISTERS
   signal SDR : std_logic_vector(7 downto 0); -- Serial Data Register
   signal SR  : std_logic_vector(7 downto 0); -- shift register
@@ -42,6 +42,9 @@ begin
   CNT_OUT <= '1' when TMRA_IN = '1' and SPMODE_delay = '1' else '0';
   CNT_OUT_EN <= '1' when timed = '0' and SPMODE_delay = '1' else '0';
   INT <= interrupt;
+  DB <= DO when read_flag = '1' else "ZZZZZZZZ";
+  DI <= DB;
+
 
 -- synchronizing CNT and creating a pulses for the rising and falling edges.
   process(PHI2) is
@@ -221,7 +224,7 @@ begin
 -- READ REGISTERS
   process (PHI2,RES_N) is
   begin
-    if falling_edge(PHI2) then
+    if rising_edge(PHI2) then
       read_flag <= '0';
       if Rd = '1' then
         case RS is

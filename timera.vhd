@@ -8,8 +8,7 @@ entity timerA is
   port ( 
 -- DATA AND CONTROL
     PHI2    : in  std_logic; -- clock 1MHz
-    DI      : in  std_logic_vector(7 downto 0); -- databus
-    DO      : out std_logic_vector(7 downto 0); -- databus
+    DB      : inout  std_logic_vector(7 downto 0); -- databus
     RS      : in  std_logic_vector(3 downto 0); -- address - register select
     RES_N   : in  std_logic; -- global reset
     Rd, Wr  : in  std_logic; -- read and write registers
@@ -27,6 +26,7 @@ entity timerA is
 end entity timerA;
 
 architecture rtl of timerA is
+  signal DI, DO      : std_logic_vector(7 downto 0);
 -- REGISTERS
   signal TA_LO       : std_logic_vector(7 downto 0); -- TMR LATCH LOAD VALUE LO
   signal TA_HI       : std_logic_vector(7 downto 0); -- TMR LATCH LOAD VALUE HI
@@ -51,13 +51,17 @@ architecture rtl of timerA is
 
 begin
 
-TMR_OUT        <= (underflow_flag and not old_underflow) when CRA_OUTMODE = '0'
-                  else TMRTOGGLE;
-TMRA_UNDERFLOW <= underflow_flag and not old_underflow;
-PB_ON_EN       <= CRA_PBON;
---CNT            <= TMRTOGGLE when CRA_SPMODE = '1' and TMRTOGGLE = '0' else 'H';
-INT            <= underflow_flag and not old_underflow;
-SPMODE         <= CRA_SPMODE;
+  TMR_OUT        <= (underflow_flag and not old_underflow) when CRA_OUTMODE = '0'
+                    else TMRTOGGLE;
+  TMRA_UNDERFLOW <= underflow_flag and not old_underflow;
+  PB_ON_EN       <= CRA_PBON;
+  --CNT            <= TMRTOGGLE when CRA_SPMODE = '1' and TMRTOGGLE = '0' else 'H';
+  INT            <= underflow_flag and not old_underflow;
+  SPMODE         <= CRA_SPMODE;
+  TODIN          <= CRA_TODIN;
+  DB <= DO when Rd = '1' else "ZZZZZZZZ";
+  DI <= DB;
+
 
   timertoggle: process(PHI2,RES_N,CRA_START,underflow_flag)
     variable old_start : std_logic ;
@@ -153,10 +157,10 @@ SPMODE         <= CRA_SPMODE;
 
 
 -- READ REGISTER
-  DO <= data when read_flag = '1' else (others => 'Z');
+  DO <= data when Rd = '1' else (others => 'Z');
   process (PHI2,RES_N) is
   begin
-    if falling_edge(PHI2) then
+    if rising_edge(PHI2) then
       read_flag <= '0';
       if Rd = '1' then
         case RS is

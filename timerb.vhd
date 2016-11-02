@@ -8,8 +8,7 @@ entity timerB is
   port ( 
 -- DATA AND CONTROL
     PHI2    : in  std_logic; -- clock 1MHz
-    DI      : in  std_logic_vector(7 downto 0); -- databus
-    DO      : out std_logic_vector(7 downto 0); -- databus
+    DB      : inout std_logic_vector(7 downto 0); -- databus
     RS      : in  std_logic_vector(3 downto 0); -- address - register select
     RES_N   : in  std_logic; -- global reset
     Rd, Wr  : in  std_logic; -- read and write registers
@@ -25,6 +24,7 @@ entity timerB is
 end entity timerB;
 
 architecture rtl of timerB is
+  signal DI, DO      : std_logic_vector(7 downto 0);
 -- REGISTERS
   signal TB_LO   : std_logic_vector(7 downto 0); -- TMR LATCH LOAD VALUE LO
   signal TB_HI   : std_logic_vector(7 downto 0); -- TMR LATCH LOAD VALUE HI
@@ -55,10 +55,13 @@ architecture rtl of timerB is
 
 begin 
 
-TMR_OUT        <= (underflow_flag and not old_underflow) when CRB_OUTMODE = '0'
-                  else TMRTOGGLE;
-PB_ON_EN       <= CRB_PBON;
-INT            <= underflow_flag and not old_underflow;
+  TMR_OUT  <= (underflow_flag and not old_underflow) when CRB_OUTMODE = '0'
+              else TMRTOGGLE;
+  PB_ON_EN <= CRB_PBON;
+  INT      <= underflow_flag and not old_underflow;
+  ALARM    <= CRB_ALARM;
+  DB <= DO when read_flag = '1' else "ZZZZZZZZ";
+  DI <= DB;
 
   timertoggle: process(PHI2,RES_N,underflow_flag)
     variable old_start : std_logic ;
@@ -161,7 +164,7 @@ INT            <= underflow_flag and not old_underflow;
   DO <= data when read_flag = '1' else (others => 'Z');
   process (PHI2,RES_N) is
   begin
-    if falling_edge(PHI2) then
+    if rising_edge(PHI2) then
       read_flag <= '0';
       if Rd = '1' then
         case RS is
