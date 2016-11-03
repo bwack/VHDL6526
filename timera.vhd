@@ -26,7 +26,8 @@ entity timerA is
 end entity timerA;
 
 architecture rtl of timerA is
-  signal DI, DO      : std_logic_vector(7 downto 0);
+  signal DI, data      : std_logic_vector(7 downto 0);
+  signal enable : std_logic;
 -- REGISTERS
   signal TA_LO       : std_logic_vector(7 downto 0); -- TMR LATCH LOAD VALUE LO
   signal TA_HI       : std_logic_vector(7 downto 0); -- TMR LATCH LOAD VALUE HI
@@ -46,7 +47,6 @@ architecture rtl of timerA is
 -- flags and other data
   signal underflow_flag : std_logic;
   signal old_underflow  : std_logic;
-  signal data      : std_logic_vector(7 downto 0); -- data for DO
   signal read_flag : std_logic; -- tristate control of DO
 
 begin
@@ -59,7 +59,10 @@ begin
   INT            <= underflow_flag and not old_underflow;
   SPMODE         <= CRA_SPMODE;
   TODIN          <= CRA_TODIN;
-  DB <= DO when Rd = '1' else "ZZZZZZZZ";
+--  DO <= data when Rd = '1' else (others => 'Z');
+
+  enable <= '1' when Rd = '1' and (RS=x"4" or RS=x"5" or RS=x"E") else '0';
+  DB <= data when enable = '1' else "ZZZZZZZZ";
   DI <= DB;
 
 
@@ -157,7 +160,7 @@ begin
 
 
 -- READ REGISTER
-  DO <= data when Rd = '1' else (others => 'Z');
+
   process (PHI2,RES_N) is
   begin
     if rising_edge(PHI2) then
@@ -180,5 +183,4 @@ begin
       end if;
     end if;
   end process;
-
 end architecture;

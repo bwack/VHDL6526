@@ -22,12 +22,12 @@ entity SerialPort is
 end entity;
 
 architecture rtl of SerialPort is
-  signal DI, DO      : std_logic_vector(7 downto 0);
+  signal DI, data      : std_logic_vector(7 downto 0);
+  signal enable : std_logic;
 -- REGISTERS
   signal SDR : std_logic_vector(7 downto 0); -- Serial Data Register
   signal SR  : std_logic_vector(7 downto 0); -- shift register
   signal SR_OUT : std_logic; -- SR output register
-  signal data      : std_logic_vector(7 downto 0); -- data for DO
 -- CONTROL
   signal CNT_old, CNT_rising, CNT_falling : std_logic;
   signal sdr_loaded, loadsreg, shift_in, shift_out, interrupt : std_logic;
@@ -42,7 +42,8 @@ begin
   CNT_OUT <= '1' when TMRA_IN = '1' and SPMODE_delay = '1' else '0';
   CNT_OUT_EN <= '1' when timed = '0' and SPMODE_delay = '1' else '0';
   INT <= interrupt;
-  DB <= DO when read_flag = '1' else "ZZZZZZZZ";
+  enable <= '1' when Rd = '1' and RS=x"C" else '0';
+  DB <= data when enable = '1' else (others => 'Z');
   DI <= DB;
 
 
@@ -220,7 +221,6 @@ begin
     end if;
   end process;
 
-  DO <= data when read_flag = '1' else (others => 'Z');
 -- READ REGISTERS
   process (PHI2,RES_N) is
   begin

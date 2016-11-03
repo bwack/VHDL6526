@@ -24,7 +24,8 @@ entity timerB is
 end entity timerB;
 
 architecture rtl of timerB is
-  signal DI, DO      : std_logic_vector(7 downto 0);
+  signal DI, data    : std_logic_vector(7 downto 0);
+  signal enable : std_logic;
 -- REGISTERS
   signal TB_LO   : std_logic_vector(7 downto 0); -- TMR LATCH LOAD VALUE LO
   signal TB_HI   : std_logic_vector(7 downto 0); -- TMR LATCH LOAD VALUE HI
@@ -49,7 +50,6 @@ architecture rtl of timerB is
   signal underflow_flag : std_logic;
   signal old_underflow  : std_logic;
   --signal old_start      : std_logic;
-  signal data      : std_logic_vector(7 downto 0); -- data for DO
   signal read_flag : std_logic; -- tristate control of DO
   signal mydebug : std_logic;
 
@@ -60,7 +60,9 @@ begin
   PB_ON_EN <= CRB_PBON;
   INT      <= underflow_flag and not old_underflow;
   ALARM    <= CRB_ALARM;
-  DB <= DO when read_flag = '1' else "ZZZZZZZZ";
+
+  enable <= '1' when Rd = '1' and (RS=x"6" or RS=x"7" or RS=x"F") else '0';
+  DB <= data when enable = '1' else "ZZZZZZZZ";
   DI <= DB;
 
   timertoggle: process(PHI2,RES_N,underflow_flag)
@@ -161,7 +163,6 @@ begin
 
 
 -- READ REGISTER
-  DO <= data when read_flag = '1' else (others => 'Z');
   process (PHI2,RES_N) is
   begin
     if rising_edge(PHI2) then

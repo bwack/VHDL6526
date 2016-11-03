@@ -19,7 +19,8 @@ entity timeofday is
 end entity timeofday;
 
 architecture rtl of timeofday is
-  signal DI, DO      : std_logic_vector(7 downto 0);
+  signal DI, data      : std_logic_vector(7 downto 0);
+  signal enable : std_logic;
 -- Please excuse the daft code. These are BCD formatted.
   signal THS, A_THS : unsigned(3 downto 0); -- Tenths of seconds
   signal SH,  A_SH  : unsigned(2 downto 0); -- Seconds, high bits
@@ -34,11 +35,12 @@ architecture rtl of timeofday is
 -- other
   signal tod_0, tod_int, tod_pulse, tick_strobe : std_logic; -- synchronize tod to phi2
   signal latch_outputs, tod_run, write_flag, read_flag, alarm, alarm0: std_logic;
-  signal data, TOD_10THS_L, TOD_SEC_L, TOD_MIN_L, TOD_HR_L : std_logic_vector(7 downto 0);
+  signal TOD_10THS_L, TOD_SEC_L, TOD_MIN_L, TOD_HR_L : std_logic_vector(7 downto 0);
 begin
 
   alarm <= '1' when THS=A_THS and SH=A_SH and SL=A_SL and MH=A_MH and ML=A_ML and HH=A_HH and HL=A_HL and PM=A_PM else '0';
-  DB <= DO when read_flag = '1' else "ZZZZZZZZ";
+  enable <= '1' when Rd = '1' and (RS=x"8" or RS=x"9" or RS=x"A" or RS=x"B") else '0';
+  DB <= data when enable = '1' else (others => 'Z');
   DI <= DB;
 
   interruptgen: process(PHI2)
@@ -212,9 +214,6 @@ begin
       end if;
     end if;
   end process;
-
-
-  DO <= data when read_flag = '1' else (others => 'Z');
 
 -- READ REGISTER
   process (PHI2,RES_N) is

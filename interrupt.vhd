@@ -24,7 +24,8 @@ entity interrupt is
 end entity interrupt;
 
 architecture rtl of interrupt is
-  signal DI, DO      : std_logic_vector(7 downto 0);
+  signal DI, data     : std_logic_vector(7 downto 0);
+  signal enable : std_logic;
 -- REGISTERS (Interrupt Control Register - x"D")
   signal ICR_DATA_L : std_logic_vector(7 downto 0); -- read only data latch
   signal ICR_MASK_L : std_logic_vector(7 downto 0); -- write only interrupt mask
@@ -32,7 +33,8 @@ architecture rtl of interrupt is
   signal ICR_READ_FLAG : std_logic; 
 begin
 
-  DB <= DO when ICR_READ_FLAG = '1' else "ZZZZZZZZ";
+  enable <= '1' when Rd = '1' and (RS = x"D") else '0';
+  DB <= data when enable = '1' else "ZZZZZZZZ";
   DI <= DB;
 
 -- Interrupt registers, write
@@ -46,7 +48,7 @@ begin
       ICR_MASK_L <= "00000000";
     elsif ICR_READ_FLAG = '1' then
         ICR_DATA_L <= x"00";
-    elsif rising_edge(PHI2) then
+    elsif falling_edge(PHI2) then
       if Wr = '1' and RS = x"D" then
         if DI(7) = '1' then
           ICR_MASK_L <= DI or ICR_MASK_L;
@@ -99,12 +101,10 @@ begin
 -- READ REGISTER
   process (PHI2) is
   begin
-    if falling_edge(PHI2) then
+    if rising_edge(PHI2) then
       ICR_READ_FLAG <= '0';
-      if RES_N = '0' then
-
-      elsif Rd = '1' and RS = x"D" then
-        DO <= ICR_DATA_L(7) & '0' & '0' & ICR_DATA_L(4 downto 0);
+      if Rd = '1' and RS = x"D" then
+        data <= ICR_DATA_L(7) & '0' & '0' & ICR_DATA_L(4 downto 0);
         ICR_READ_FLAG <= '1';
       end if;
     end if;

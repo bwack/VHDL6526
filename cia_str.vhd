@@ -76,8 +76,7 @@ architecture str of cia is
     Rd, Wr  : in  std_logic; -- read and write registers
 -- INPUTS & OUTPUTS
 -- IO interface to  be used with IO buffer.
-    PA_BUF_IN      : inout  std_logic_vector(7 downto 0);
-    PA_BUF_OUT     : inout std_logic_vector(7 downto 0)
+    PA      : inout std_logic_vector(7 downto 0)
   );
   end component port_a;
 
@@ -90,8 +89,7 @@ architecture str of cia is
     RES_N   : in  std_logic; -- global reset
     Rd, Wr  : in  std_logic; -- read and write registers
 -- I/O
-    PB_BUF_IN      : inout std_logic_vector(7 downto 0);
-    PB_BUF_OUT     : inout std_logic_vector(7 downto 0);
+    PB             : inout std_logic_vector(7 downto 0);
     TMRA_PB_IN     : in std_logic; -- from TMRA to PB6 if TMRA_PB_ON = '1'
     TMRB_PB_IN     : in std_logic; -- from TMRB to PB7 if TMRB_PB_ON = '1'
     TMRA_PB_ON     : in std_logic; -- puts TMRA_OUT on PB, overrides bit in DDRB.
@@ -180,18 +178,17 @@ begin
     CNT=>CNT, TMRA_UNDERFLOW=>TMRA_UNDERFLOW_i, TMR_OUT=>TMRB_OUT_i,
     PB_ON_EN=>TMRB_PB_ON_i, ALARM=>ALARM_i, INT=>INT_TMRB_i
   );
- 
+
   PORTA_0: entity work.port_a
   port map (
     PHI2=>PHI2, DB=>DB, RS=>RS, RES_N=>RES_N, Rd=>Rd, Wr=>Wr,
-    PA_BUF_IN=>PA, PA_BUF_OUT=>PA
+    PA=>PA
   );
  
   PORTB_0: entity work.port_b
   port map (
     PHI2=>PHI2, DB=>DB, RS=>RS, RES_N=>RES_N, Rd=>Rd, Wr=>Wr,
-    PB_BUF_IN=>PB, PB_BUF_OUT=>PB,
-    TMRA_PB_IN=>TMRA_OUT_i, TMRB_PB_IN=>TMRB_OUT_i,
+    PB=>PB, TMRA_PB_IN=>TMRA_OUT_i, TMRB_PB_IN=>TMRB_OUT_i,
     TMRA_PB_ON=>TMRA_PB_ON_i, TMRB_PB_ON=>TMRB_PB_ON_i, PC_N=>PC_N
   );
  
@@ -211,11 +208,11 @@ begin
   );
   INT_FLAG_i <= FLAG_N;
   IRQ_N <= not IRQ_i;
- 
-  TIMEOFDAY_0: entity work.timeofday
-  port map (
-    PHI2=>PHI2, DB=>DB, RS=>RS, RES_N=>RES_N, Rd=>Rd, Wr=>Wr,
-    TODIN=>TOD, CRA_TODIN=>TODIN_i, CRB_ALARM=>ALARM_i, INT=>INT_TODALARM_i
-  );
+-- 
+--  TIMEOFDAY_0: entity work.timeofday
+--  port map (
+--    PHI2=>PHI2, DB=>DB, RS=>RS, RES_N=>RES_N, Rd=>Rd, Wr=>Wr,
+--    TODIN=>TOD, CRA_TODIN=>TODIN_i, CRB_ALARM=>ALARM_i, INT=>INT_TODALARM_i
+--  );
 
 end architecture str;
