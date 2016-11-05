@@ -11,7 +11,7 @@ entity timeofday is
     RES_N   : in  std_logic; -- global reset
     Rd, Wr  : in  std_logic; -- read and write registers
 --
-    TODIN     : in std_logic; -- 50 or 60 Hz timer input.
+    TOD       : in std_logic; -- 50 or 60 Hz timer input.
     CRA_TODIN : in std_logic;
     CRB_ALARM : in std_logic; -- Writing to TOD registers: 1=sets ALARM, 0=sets time
     INT       : out std_logic -- interrupt on alarm
@@ -58,7 +58,7 @@ begin
   variable count : integer := 0;
   begin
     if rising_edge(PHI2) then
-      tod_0 <= TODIN;
+      tod_0 <= TOD;
       tod_int <= tod_0;
       tod_pulse <= '0';
       tick_strobe <= '0';

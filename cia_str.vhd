@@ -20,7 +20,7 @@ entity cia is
     FLAG_N     : in    std_logic;                    -- pin 24
     PC_N       : out   std_logic;                    -- pin 18
     IRQ_N      : out   std_logic;                    -- pin 21
-    TOD        : inout std_logic                     -- pin 19
+    TOD        : in    std_logic                     -- pin 19
   );
 end entity cia;
 
@@ -147,7 +147,7 @@ architecture str of cia is
     RES_N   : in  std_logic; -- global reset
     Rd, Wr  : in  std_logic; -- read and write registers
 --
-    TODIN     : in std_logic; -- 50 or 60 Hz timer input.
+    TOD       : in std_logic; -- 50 or 60 Hz timer input.
     CRA_TODIN : in std_logic;
     CRB_ALARM : in std_logic; -- Writing to TOD registers: 1=sets ALARM, 0=sets time
     INT       : out std_logic -- interrupt on alarm
@@ -208,11 +208,11 @@ begin
   );
   INT_FLAG_i <= FLAG_N;
   IRQ_N <= not IRQ_i;
--- 
---  TIMEOFDAY_0: entity work.timeofday
---  port map (
---    PHI2=>PHI2, DB=>DB, RS=>RS, RES_N=>RES_N, Rd=>Rd, Wr=>Wr,
---    TODIN=>TOD, CRA_TODIN=>TODIN_i, CRB_ALARM=>ALARM_i, INT=>INT_TODALARM_i
---  );
+ 
+  TIMEOFDAY_0: entity work.timeofday
+  port map (
+    PHI2=>PHI2, DB=>DB, RS=>RS, RES_N=>RES_N, Rd=>Rd, Wr=>Wr,
+    TOD=>TOD, CRA_TODIN=>TODIN_i, CRB_ALARM=>ALARM_i, INT=>INT_TODALARM_i
+  );
 
 end architecture str;

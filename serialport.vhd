@@ -228,7 +228,7 @@ begin
       read_flag <= '0';
       if Rd = '1' then
         case RS is
-          when x"C"   => data <= DI; read_flag <= '1';
+          when x"C"   => data <= SDR; read_flag <= '1';
           when others => null;
         end case;
       end if;

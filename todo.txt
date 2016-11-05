@@ -1,1 +1,1 @@
-continue on testbench and databus drivers
+The serialport, only tested input mode.

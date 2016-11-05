@@ -28,6 +28,7 @@ architecture beh1 of testbench is
   signal RES_N,PHI2,CS_N,RW,SP,CNT,FLAG_N,PC_N,IRQ_N,TOD : std_logic;
   signal DB,PA,PB : std_logic_vector(7 downto 0);
   signal RS : std_logic_vector(3 downto 0);
+
   procedure reset_proc( signal PHI2, RES_N : out std_logic ) is
   begin
       PHI2 <= '1';
@@ -55,7 +56,6 @@ architecture beh1 of testbench is
     end loop;
   end procedure nop_proc;
 
-
   procedure bus_proc ( signal PHI2 : out std_logic;
                        signal CS_N : out std_logic;
                        signal RW   : out std_logic;
@@ -79,9 +79,10 @@ architecture beh1 of testbench is
     wait for 390 ns;
     PHI2 <= '1';
 
-    wait for 500 ns;
+    wait for 480 ns;
     PHI2 <= '0';
-    DB <= (others => 'Z');
+    wait for 20 ns;
+    --DB <= (others => 'Z');
   end procedure bus_proc;
  
 
@@ -110,6 +111,8 @@ begin
 
   STIMULI_0: process
   begin
+    CNT <= '1';
+    SP <= 'H';
     DB <= "ZZZZZZZZ";
     CS_N <= '1';
     RW <= '1';
@@ -118,37 +121,118 @@ begin
     nop_proc(PHI2,CS_N,RW,RS,1);
 --    nop_proc(PHI2,1);
 --    nop_proc(PHI2,4);
-    bus_proc(PHI2,CS_N,RW,DB,RS,'0',x"40",x"4");
-    bus_proc(PHI2,CS_N,RW,DB,RS,'0',x"25",x"5");
+    bus_proc(PHI2,CS_N,RW,DB,RS,'0',x"05",x"4");
+    bus_proc(PHI2,CS_N,RW,DB,RS,'0',x"00",x"5");
     bus_proc(PHI2,CS_N,RW,DB,RS,'0',x"11",x"E");
     bus_proc(PHI2,CS_N,RW,DB,RS,'0',x"FF",x"3");
     bus_proc(PHI2,CS_N,RW,DB,RS,'0',x"FF",x"1");
     bus_proc(PHI2,CS_N,RW,DB,RS,'0',x"03",x"E");
     bus_proc(PHI2,CS_N,RW,DB,RS,'0',x"0F",x"2");
     bus_proc(PHI2,CS_N,RW,DB,RS,'0',x"33",x"0");
-    DB <= "ZZZZZZZZ";
     bus_proc(PHI2,CS_N,RW,DB,RS,'1',x"00",x"D");
     bus_proc(PHI2,CS_N,RW,DB,RS,'1',x"00",x"3");
     bus_proc(PHI2,CS_N,RW,DB,RS,'1',x"00",x"4");
     bus_proc(PHI2,CS_N,RW,DB,RS,'1',x"00",x"5");
     bus_proc(PHI2,CS_N,RW,DB,RS,'1',x"00",x"E");
-    nop_proc(PHI2,CS_N,RW,RS,20000);
+    nop_proc(PHI2,CS_N,RW,RS,7);
     bus_proc(PHI2,CS_N,RW,DB,RS,'0',x"01",x"E");
+    nop_proc(PHI2,CS_N,RW,RS,7);
     bus_proc(PHI2,CS_N,RW,DB,RS,'0',x"81",x"D");
-    nop_proc(PHI2,CS_N,RW,RS,10000);
+    nop_proc(PHI2,CS_N,RW,RS,7);
     bus_proc(PHI2,CS_N,RW,DB,RS,'1',x"00",x"D");
-    nop_proc(PHI2,CS_N,RW,RS,10000);
-    bus_proc(PHI2,CS_N,RW,DB,RS,'0',x"00",x"E");
-    nop_proc(PHI2,CS_N,RW,RS,10000);
+    nop_proc(PHI2,CS_N,RW,RS,7);
+    bus_proc(PHI2,CS_N,RW,DB,RS,'0',x"80",x"E");
+    bus_proc(PHI2,CS_N,RW,DB,RS,'0',x"01",x"D");
+    nop_proc(PHI2,CS_N,RW,RS,7);
+    bus_proc(PHI2,CS_N,RW,DB,RS,'1',x"00",x"D");
+    nop_proc(PHI2,CS_N,RW,RS,7);
+    bus_proc(PHI2,CS_N,RW,DB,RS,'0',x"00",x"F");
+--    bus_proc(PHI2,CS_N,RW,DB,RS,'0',x"80",x"B");
+--    bus_proc(PHI2,CS_N,RW,DB,RS,'0',x"59",x"A");
+--    bus_proc(PHI2,CS_N,RW,DB,RS,'0',x"59",x"9");
+--    bus_proc(PHI2,CS_N,RW,DB,RS,'0',x"08",x"8");
+--    bus_proc(PHI2,CS_N,RW,DB,RS,'0',x"84",x"D");
+--    bus_proc(PHI2,CS_N,RW,DB,RS,'0',x"80",x"F");
+--    bus_proc(PHI2,CS_N,RW,DB,RS,'0',x"81",x"B");
+--    bus_proc(PHI2,CS_N,RW,DB,RS,'0',x"00",x"A");
+--    bus_proc(PHI2,CS_N,RW,DB,RS,'0',x"00",x"9");
+--    bus_proc(PHI2,CS_N,RW,DB,RS,'0',x"00",x"8");
+--    bus_proc(PHI2,CS_N,RW,DB,RS,'0',x"25",x"4");
+--    bus_proc(PHI2,CS_N,RW,DB,RS,'0',x"00",x"5");
+--    bus_proc(PHI2,CS_N,RW,DB,RS,'0',x"11",x"E");
+--    bus_proc(PHI2,CS_N,RW,DB,RS,'0',x"81",x"D");
+--    loop
+--      nop_proc(PHI2,CS_N,RW,RS,1);
+--      if IRQ_N = '0' then
+--        nop_proc(PHI2,CS_N,RW,RS,6);
+--        bus_proc(PHI2,CS_N,RW,DB,RS,'1',x"00",x"D");
+--        nop_proc(PHI2,CS_N,RW,RS,6);
+--      end if;
+--    end loop;
+
+-- scan keyboard
+    -- PB(3) <= PA(4); -- keypress
+    nop_proc(PHI2,CS_N,RW,RS,10);
+    reset_proc(PHI2,RES_n);
+    nop_proc(PHI2,CS_N,RW,RS,1);
+    bus_proc(PHI2,CS_N,RW,DB,RS,'0',x"FF",x"2");
+    bus_proc(PHI2,CS_N,RW,DB,RS,'0',"11111110",x"0");
+    bus_proc(PHI2,CS_N,RW,DB,RS,'1',x"00",x"1");
+    bus_proc(PHI2,CS_N,RW,DB,RS,'0',"11111101",x"0");
+    bus_proc(PHI2,CS_N,RW,DB,RS,'1',x"00",x"1");
+    bus_proc(PHI2,CS_N,RW,DB,RS,'0',"11111011",x"0");
+    bus_proc(PHI2,CS_N,RW,DB,RS,'1',x"00",x"1");
+    bus_proc(PHI2,CS_N,RW,DB,RS,'0',"11110111",x"0");
+    bus_proc(PHI2,CS_N,RW,DB,RS,'1',x"00",x"1");
+    bus_proc(PHI2,CS_N,RW,DB,RS,'0',"11101111",x"0");
+    bus_proc(PHI2,CS_N,RW,DB,RS,'1',x"00",x"1");
+    bus_proc(PHI2,CS_N,RW,DB,RS,'0',"11011111",x"0");
+    bus_proc(PHI2,CS_N,RW,DB,RS,'1',x"00",x"1");
+    bus_proc(PHI2,CS_N,RW,DB,RS,'0',"10111111",x"0");
+    bus_proc(PHI2,CS_N,RW,DB,RS,'1',x"00",x"1");
+    bus_proc(PHI2,CS_N,RW,DB,RS,'0',"01111111",x"0");
+    bus_proc(PHI2,CS_N,RW,DB,RS,'1',x"00",x"1");
+
+-- serial port as input
+    nop_proc(PHI2,CS_N,RW,RS,10);
+    reset_proc(PHI2,RES_n);
+    nop_proc(PHI2,CS_N,RW,RS,1);
+    bus_proc(PHI2,CS_N,RW,DB,RS,'0',x"00",x"E"); -- spmode=input
+    bus_proc(PHI2,CS_N,RW,DB,RS,'0',x"88",x"D"); -- set interrupt mask
+    SP<='1';
+    for i in 0 to 7 loop
+      CNT <= '0';
+      nop_proc(PHI2,CS_N,RW,RS,10);
+      CNT <= '1';
+      nop_proc(PHI2,CS_N,RW,RS,10);
+    end loop;
+    CNT <= '0';
+    SP<='0';    
+    nop_proc(PHI2,CS_N,RW,RS,6);
+    bus_proc(PHI2,CS_N,RW,DB,RS,'1',x"00",x"D");
+    bus_proc(PHI2,CS_N,RW,DB,RS,'1',x"00",x"C");
+    nop_proc(PHI2,CS_N,RW,RS,6);
+    for i in 0 to 7 loop
+      CNT <= '0';
+      nop_proc(PHI2,CS_N,RW,RS,10);
+      CNT <= '1';
+      nop_proc(PHI2,CS_N,RW,RS,10);
+    end loop;
+    CNT <= '0';
+    nop_proc(PHI2,CS_N,RW,RS,6);
+    bus_proc(PHI2,CS_N,RW,DB,RS,'1',x"00",x"D");
+    bus_proc(PHI2,CS_N,RW,DB,RS,'1',x"00",x"C");
+    nop_proc(PHI2,CS_N,RW,RS,6);
+
     wait;
   end process STIMULI_0;
   
   TOD_0: process
   begin
     TOD <= '0';
-    wait for 10 ms;
+    wait for 10.3 us;
     TOD <= '1';
-    wait for 10 ms;
+    wait for 10.3 us;
   end process;
 
 
