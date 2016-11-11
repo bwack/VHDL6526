@@ -38,7 +38,8 @@ architecture rtl of SerialPort is
   signal SPMODE_delay : std_logic;
 --  signal cnt_pulse : std_logic;
 begin
-  SP <= SR_OUT when SPMODE = '1' else 'Z';
+--  SP <= SR_OUT when SPMODE = '1' else 'Z';
+  SP <= SR(7) when SPMODE = '1' else 'Z';
   CNT_OUT <= '1' when TMRA_IN = '1' and SPMODE_delay = '1' else '0';
   CNT_OUT_EN <= '1' when timed = '0' and SPMODE_delay = '1' else '0';
   INT <= interrupt;
@@ -68,7 +69,7 @@ begin
     end if;
   end process;
 
-  sdrload: process(PHI2) is
+  sdrload: process(PHI2,RES_N) is
   begin
     if RES_N = '0' then
       sdr_loaded <= '0';
@@ -82,7 +83,7 @@ begin
   end process;
 
 -- 8 cnt pulses timer
-  timeder: process(PHI2) is
+  timeder: process(PHI2,RES_N) is
     variable count : integer;
   begin
     if RES_N = '0' or sync_rst = '1' then
@@ -180,21 +181,14 @@ begin
     end case;    
   end process com;
 
-  process(PHI2) is
+  process(PHI2,RES_N) is
   begin
     if RES_N = '0' then
       SR <= "00000000";
       SR_OUT <= '0';
     elsif rising_edge(PHI2) then
       if shift_in = '1' then
-        SR(0) <= SP;
-        SR(1) <= SR(0);
-        SR(2) <= SR(1);
-        SR(3) <= SR(2);
-        SR(4) <= SR(3);
-        SR(5) <= SR(4);
-        SR(6) <= SR(5);
-        SR(7) <= SR(6);
+        SR <= SR(6 downto 0) & SP;
       elsif shift_out = '1' then
         SR_OUT <= SR(7);       
       elsif loadsreg = '1' then

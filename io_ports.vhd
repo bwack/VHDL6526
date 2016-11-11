@@ -119,9 +119,8 @@ begin
   PB(5) <= PRB(5) when DDRB(5) = '1' else 'H';
   PB(6) <= PRB(6) when DDRB(6) = '1' and TMRA_PB_ON = '0' else
            TMRA_PB_IN when TMRA_PB_ON = '1' else 'H';
-  PB(7) <= PRB(7) when DDRB(7) = '1' and TMRB_PB_ON = '0' else 'H';
- -- PB(6) <= TMRA_PB_IN when TMRA_PB_ON = '1' else 'H';
-  PB(7) <= TMRB_PB_IN when TMRB_PB_ON = '1' else 'H';
+  PB(7) <= PRB(7) when DDRB(7) = '1' and TMRB_PB_ON = '0' else
+           TMRB_PB_IN when TMRB_PB_ON = '1' else 'H';
   PB_IN <= PB;
   PC_N <= '0'  when port_read_flag = '1' or port_write_flag = '1' else '1';
 
