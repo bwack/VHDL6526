@@ -8,12 +8,13 @@ entity timerB is
   port ( 
 -- DATA AND CONTROL
     PHI2    : in  std_logic; -- clock 1MHz
-    DB      : inout std_logic_vector(7 downto 0); -- databus
+    DI      : in  std_logic_vector(7 downto 0);
+    DO      : out std_logic_vector(7 downto 0);
     RS      : in  std_logic_vector(3 downto 0); -- address - register select
     RES_N   : in  std_logic; -- global reset
     Rd, Wr  : in  std_logic; -- read and write registers
 -- INPUTS
-    CNT     : in  std_logic; -- counter
+    CNT            : in  std_logic; -- counter
     TMRA_UNDERFLOW : in std_logic; -- underflow pulses from timer A.
 -- OUTPUTS
     TMR_OUT        : out std_logic; -- timer B output to PORTB
@@ -24,7 +25,7 @@ entity timerB is
 end entity timerB;
 
 architecture rtl of timerB is
-  signal DI, data    : std_logic_vector(7 downto 0);
+  signal data_out    : std_logic_vector(7 downto 0);
   signal enable : std_logic;
 -- REGISTERS
   signal TB_LO   : std_logic_vector(7 downto 0); -- TMR LATCH LOAD VALUE LO
@@ -41,6 +42,7 @@ architecture rtl of timerB is
                                                      --        while CNT is high
   signal CRB_ALARM   : std_logic; -- 1=Writing to TOD registers sets ALARM
                                   -- 0=Writing to TOD registers sets TOD clock
+  signal CRB_REG     : std_logic_vector(7 downto 0); -- alias for CRB
   signal TMRB        : std_logic_vector(15 downto 0); -- read only timer counter
 -- OTHER
   signal TMRCLOCK    : std_logic;
@@ -62,8 +64,8 @@ begin
   ALARM    <= CRB_ALARM;
 
   enable <= '1' when Rd = '1' and (RS=x"6" or RS=x"7" or RS=x"F") else '0';
-  DB <= data when enable = '1' else "ZZZZZZZZ";
-  DI <= DB;
+  DO <= data_out;
+  --DI <= DB;
 
   timertoggle: process(PHI2,RES_N,underflow_flag)
     variable old_start : std_logic ;
@@ -109,15 +111,17 @@ begin
     if RES_N = '0' then
       TMRB <= x"ffff";
       underflow_flag <= '0';
-    elsif CRB_LOAD = '1' then
-      TMRB <= TB_HI & TB_LO;
     elsif rising_edge(TMRCLOCK) then
-        underflow_flag <= '0';
-      if TMRB = "0000000000000000" and CRB_START = '1' then
-        underflow_flag <= '1';
+      if CRB_LOAD = '1' then
         TMRB <= TB_HI & TB_LO;
-      elsif CRB_START = '1' then
-          TMRB <= std_logic_vector(unsigned(TMRB) - 1);
+      else
+          underflow_flag <= '0';
+        if TMRB = "0000000000000000" and CRB_START = '1' then
+          underflow_flag <= '1';
+          TMRB <= TB_HI & TB_LO;
+        elsif CRB_START = '1' then
+            TMRB <= std_logic_vector(unsigned(TMRB) - 1);
+        end if;
       end if;
     end if;
   end process timerB;
@@ -169,21 +173,30 @@ begin
       read_flag <= '0';
       if Rd = '1' then
         case RS is
-          when x"6" => data <= TMRB(7 downto 0);  read_flag <= '1';
-          when x"7" => data <= TMRB(15 downto 8); read_flag <= '1';
-          when x"F" => data <= (
-                                 CRB_ALARM   &
-                                 CRB_INMODE  &
-                                 '0'         &
-                                 CRB_RUNMODE &
-                                 CRB_OUTMODE &
-                                 CRB_PBON    &
-                                 CRB_START  ); read_flag <= '1';
+          when x"6" => read_flag <= '1';
+          when x"7" => read_flag <= '1';
+          when x"F" => read_flag <= '1';
           when others => null;
         end case;
       end if;
     end if;
   end process;
+  
+  CRB_REG <= (
+                CRB_ALARM   &
+                CRB_INMODE  &
+                '0'         &
+                CRB_RUNMODE &
+                CRB_OUTMODE &
+                CRB_PBON    &
+                CRB_START  );
 
+  with RS select
+    data_out <= TMRB( 7 downto 0) when x"6",
+                TMRB(15 downto 8) when x"7",
+                CRB_REG when x"F",
+                (others => '0') when others;
+               
+  
 end architecture;
 

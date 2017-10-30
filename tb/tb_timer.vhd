@@ -1,28 +1,32 @@
 library ieee;
 use ieee.std_logic_1164.all;
 
-entity tb_timerA is
--- empty
-end tb_timerA;
+use work.base_pck.all;
 
-architecture behaviour of tb_timerA is
+entity tb_timer is
+-- empty
+end tb_timer;
+
+architecture behaviour of tb_timer is
   component timerA is
   port ( 
 -- DATA AND CONTROL
     PHI2    : in  std_logic; -- clock 1MHz
-    DI      : in  std_logic_vector(7 downto 0); -- databus
-    DO      : out std_logic_vector(7 downto 0); -- databus
+    DI      : in  std_logic_vector(7 downto 0);
+    DO      : out std_logic_vector(7 downto 0);
     RS      : in  std_logic_vector(3 downto 0); -- address - register select
     RES_N   : in  std_logic; -- global reset
     Rd, Wr  : in  std_logic; -- read and write registers
 --  Rd and Wr are driven by CS_N and Rd/Wr in the chip access control
 -- INPUTS
-    CNT     : in  std_logic; -- counter
+    CNT     : in std_logic; -- counter
 -- OUTPUTS
-    TMR_OUT        : out std_logic; -- timer A output to PORTB
     TMRA_UNDERFLOW : out std_logic; -- timer A underflow pulses for timer B.
+    TMR_OUT        : out std_logic; -- timer A output to PORTB
     PB_ON_EN       : out std_logic; -- enable timer A output on PB6 else PB6 is I/O
-    IRQ            : out std_logic
+    SPMODE         : out std_logic; -- CRA_SPMODE forwarding to serial port
+    TODIN          : out std_logic; -- CRA_TODIN forwarding to tod
+    INT            : out std_logic
   );
   end component timerA;
 
@@ -36,352 +40,402 @@ architecture behaviour of tb_timerA is
     RES_N   : in  std_logic; -- global reset
     Rd, Wr  : in  std_logic; -- read and write registers
 -- INPUTS
-    CNT     : in  std_logic; -- counter
+    CNT            : in  std_logic; -- counter
     TMRA_UNDERFLOW : in std_logic; -- underflow pulses from timer A.
 -- OUTPUTS
     TMR_OUT        : out std_logic; -- timer B output to PORTB
     PB_ON_EN       : out std_logic; -- enable timer B output on PB7 else PB7 is I/O
-    IRQ            : out std_logic
+    ALARM          : out std_logic; -- CRB_ALARM forwarding to tod
+    INT            : out std_logic
   );
   end component timerB;
+  
+  signal run : boolean := true;
 
-  signal PHI2, RES_N, Rd, Wr : std_logic;
-  signal DI, DO              : std_logic_vector(7 downto 0);
-  signal RS                  : std_logic_Vector(3 downto 0);
-  signal TMRA_OUT, TMRB_OUT, TMRA_UNDERFLOW : std_logic;
-  signal TMRA_PB_ON_EN, TMRB_PB_ON_EN, CNT, TMRA_IRQ, TMRB_IRQ : std_logic;
-  constant HALFPERIOD : time := 500 ns;
+  signal PHI2, RES_N, RW, Rd, Wr, CS_N: std_logic;
+  signal DI                           : std_logic_vector(7 downto 0);
+  signal TMRA_DO, TMRB_DO             : std_logic_vector(7 downto 0);
+  signal RS                           : std_logic_Vector(3 downto 0);
+  signal CNT                          : std_logic;
+  signal TMRA_UNDERFLOW               : std_logic; -- shared with TimerA and B
+  signal TMRA_OUT, TMRB_OUT           : std_logic;
+  signal TMRA_PB_ON_EN, TMRB_PB_ON_EN : std_logic;
+  signal TMRA_INT, TMRB_INT           : std_logic;
+  signal CRB_ALARM                    : std_logic;
+  
 begin
+  -- on the top structure RW is decoded into Rd and Wr
+  Rd <=     RW and not CS_N;
+  Wr <= not RW and not CS_N;
+
   UUT_TMRA: entity work.timerA(rtl)
     port map (
-      PHI2=>PHI2, DI=>DI, DO=>DO, RS=>RS, RES_N=>RES_N, Rd=>Rd, Wr=>Wr,
-      CNT => CNT, TMR_OUT => TMRA_OUT, TMRA_UNDERFLOW => TMRA_UNDERFLOW,
-      PB_ON_EN => TMRA_PB_ON_EN, IRQ => TMRA_IRQ
+      PHI2           => PHI2,
+      DI             => TMRA_DI,
+      DO             => TMRA_DO,
+      RS             => RS,
+      RES_N          => RES_N,
+      Rd             => Rd,
+      Wr             => Wr,
+      CNT            => CNT,
+      TMRA_UNDERFLOW => TMRA_UNDERFLOW,
+      TMR_OUT        => TMRA_OUT,
+      PB_ON_EN       => TMRA_PB_ON_EN,
+      INT            => TMRA_INT
     );
 
   UUT_TMRB: entity work.timerB(rtl)
     port map (
-      PHI2=>PHI2, DI=>DI, DO=>DO, RS=>RS, RES_N=>RES_N, Rd=>Rd, Wr=>Wr,
-      CNT => CNT, TMRA_UNDERFLOW => TMRA_UNDERFLOW,
-      TMR_OUT => TMRB_OUT, PB_ON_EN  => TMRB_PB_ON_EN, IRQ => TMRB_IRQ
+      PHI2           => PHI2,
+      DI             => TMRB_DI,
+      DO             => TMRB_DO,
+      RS             => RS,
+      RES_N          => RES_N,
+      Rd             => Rd,
+      Wr             => Wr,
+      CNT            => CNT,
+      TMRA_UNDERFLOW => TMRA_UNDERFLOW,
+      TMR_OUT        => TMRB_OUT,
+      PB_ON_EN       => TMRB_PB_ON_EN,
+      ALARM          => CRB_ALARM,
+      INT            => TMRB_INT
     );
 
-
-P_CLK_0: process
+  P_CLK_0: process
   begin
-    PHI2 <= '0';
-    wait for HALFPERIOD;
-    PHI2 <= '1';
-    wait for HALFPERIOD;    
+    while run loop
+      PHI2 <= '0';
+      wait for HALFPERIOD;
+      PHI2 <= '1';
+      wait for HALFPERIOD;    
+    end loop;
+    wait;
   end process P_CLK_0;
 
 -- an alternative and slower cnt signal than the PHI2 for the timer tick input
-P_CNT_0: process
+  P_CNT_0: process
   begin
-    CNT <= '0';
-    wait for 11.3 us;
-    CNT <= '1';
-    wait for 11.3 us;
+    while run loop
+      CNT <= '0';
+      wait for 11.3 us;
+      CNT <= '1';
+      wait for 11.3 us;
+    end loop;
+    wait;
   end process P_CNT_0;
 
+  STIMULI_0:
   process
   begin
-
+    -- init at time zero
+    RES_N <= '1';
+    CS_N  <= '1';
+    RW    <= '1';
+    DI <= (others => '0');
+    RS    <= x"0";
+    wait until rising_edge(PHI2);
+    
 -- simple start stop test
-    res_n <= '0';
-    Wr <= '0';
-    Rd <= '0';
-    wait for HALFPERIOD*3;
-    res_n <= '1';
-    wait for HALFPERIOD*4;
-    Wr <= '1';
-    RS <= x"F";
-    DI <= "00000001"; -- start B
-    wait for HALFPERIOD*2;
-    Wr <= '1';
-    RS <= x"E";
-    DI <= "00000001"; -- start A
-    wait for HALFPERIOD*2;
-    Wr <= '0';
-    wait for HALFPERIOD*2*6;
-    Wr <= '1';
-    RS <= x"F";
-    DI <= "00000000"; -- stop B
-    wait for HALFPERIOD*2;
-    Wr <= '1';
-    RS <= x"E";
-    DI <= "00000000"; -- stop A
-    wait for HALFPERIOD*2;
-    Wr <= '0';
-    wait for HALFPERIOD*2*6;
+-----------    res_n <= '0';
+-----------    Wr <= '0';
+-----------    Rd <= '0';
+-----------    wait for HALFPERIOD*3;
+-----------    res_n <= '1';
+-----------    wait for HALFPERIOD*4;
+reset_proc(PHI2, RES_N);
+nop_proc(PHI2, 4);
 
+-----------    Wr <= '1';
+-----------    RS <= x"F";
+-----------    DI <= "00000001"; -- start B
+-----------    wait for HALFPERIOD*2;
+bus_proc(PHI2,CS_N,RW,DI,RS,'1',"00000001",x"F");
+nop_proc(PHI2, 4);
 
--- test one-shot mode, verify output toggle
-    res_n <= '0';
-    wait for HALFPERIOD*2;
-    res_n <= '1';
-    wait for HALFPERIOD*4;
-    Wr <= '1';
-    RS <= x"4";             -- TA_LO
-    DI <= "00001010";
-    wait for HALFPERIOD*2;
-    Wr <= '1';
-    RS <= x"5";             -- TA_HI (timerA auto loads after this write)
-    DI <= "00000000";
-    wait for HALFPERIOD*2;
-    Wr <= '1';
-    RS <= x"6";             -- TB_LO
-    DI <= "00001010";
-    wait for HALFPERIOD*2;
-    Wr <= '1';
-    RS <= x"7";             -- TB_HI (timerB auto loads after this write)
-    DI <= "00000000";       -- therefor TB_LO was written before TB_HI
-    wait for HALFPERIOD*2;
-    Wr <= '0';
-    wait for HALFPERIOD*2;
-    Wr <= '1';
-    RS <= x"F";
-    DI <= "00001011"; -- CRB: start, pb-on, pulse, one-shot
-    wait for HALFPERIOD*2;
-    Wr <= '1';
-    RS <= x"E";
-    DI <= "00001011"; -- CRA: same
-    wait for HALFPERIOD*2;
-    Wr <= '0';
-    wait for HALFPERIOD*2*4;
-    -- timer still running, do force loads.
-    Wr <= '1';
-    RS <= x"F";
-    DI <= "00011011";
-    wait for HALFPERIOD*2;
-    Wr <= '1';
-    RS <= x"E";
-    DI <= "00011011";
-    wait for HALFPERIOD*2;
-    Wr <= '0';
-    wait for HALFPERIOD*2*35;
-    Wr <= '1';
-    RS <= x"F";
-    DI <= "00011011";
-    wait for HALFPERIOD*2;
-    Wr <= '1';
-    RS <= x"E";
-    DI <= "00011011";
-    wait for HALFPERIOD*2;
-    Wr <= '0';
-    wait for HALFPERIOD*2*25;
-
-
--- toggle or single phi2-period pulses on timer underflow
-    res_n <= '0';
-    wait for HALFPERIOD*2;
-    res_n <= '1';
-    wait for HALFPERIOD*4;
-    Wr <= '1';
-    RS <= x"4";             -- TA_LO
-    DI <= "00000011";
-    wait for HALFPERIOD*2;
-    Wr <= '1';
-    RS <= x"5";             -- TA_HI (timerA auto loads after this write)
-    DI <= "00000000";
-    wait for HALFPERIOD*2;
-    Wr <= '1';
-    RS <= x"6";             -- TB_LO
-    DI <= "00000011";
-    wait for HALFPERIOD*2;
-    Wr <= '1';
-    RS <= x"7";             -- TB_HI (timerB auto loads after this write)
-    DI <= "00000000";       -- therefor TB_LO was written before TB_HI
-    wait for HALFPERIOD*2;
-    Wr <= '0';
-    wait for HALFPERIOD*2;
-    Wr <= '1';
-    RS <= x"F";
-    DI <= "00000011"; -- CRB: start, pb-on, pulse, continuous
-    wait for HALFPERIOD*2;
-    Wr <= '1';
-    RS <= x"E";
-    DI <= "00000011"; -- CRA: same
-    wait for HALFPERIOD*2;
-    Wr <= '0';
-    wait for HALFPERIOD*2*15;
-    Wr <= '1';
-    RS <= x"F";
-    DI <= "00000111"; -- CRB: start, pb-on, toggles, continuous
-    wait for HALFPERIOD*2;
-    Wr <= '1';
-    RS <= x"E";
-    DI <= "00000111"; -- CRA: same
-    wait for HALFPERIOD*2;
-    Wr <= '0';
-    wait for HALFPERIOD*2*15;
-
-    res_n <= '0';
-    wait for HALFPERIOD*2;
-    res_n <= '1';
-    wait for HALFPERIOD*4;
-
---  2. TIMER A can count 02 clock pulses
---  => tested ok above
-
---     or external pulses applied to the CNT pin. (testing B here also)
-    res_n <= '0';
-    wait for HALFPERIOD*2;
-    res_n <= '1';
-    wait for HALFPERIOD*4;
-    Wr <= '1';
-    RS <= x"4";             -- TA_LO
-    DI <= "00000011";
-    wait for HALFPERIOD*2;
-    Wr <= '1';
-    RS <= x"5";             -- TA_HI
-    DI <= "00000000";
-    wait for HALFPERIOD*2;
-    Wr <= '1';
-    RS <= x"6";             -- TB_LO
-    DI <= "00000011";
-    wait for HALFPERIOD*2;
-    Wr <= '1';
-    RS <= x"7";             -- TB_HI
-    DI <= "00000000";
-    wait for HALFPERIOD*2;
-    Wr <= '1';
-    RS <= x"F";
-    DI <= "00100001"; -- CRB: start and count using CNT
-    wait for HALFPERIOD*2;
-    Wr <= '1';
-    RS <= x"E";
-    DI <= "00100001"; -- CRA: same
-    wait for HALFPERIOD*2;
-    Wr <= '0';
-    wait for HALFPERIOD*2*300; -- long one, CNT is slow
-
---  3. TIMER B can count 02 pulses, external CNT pulses,
---  => tested OK.
-
---     TIMER B can count TIMER A underflow pulses
-    res_n <= '0';
-    wait for HALFPERIOD*2;
-    res_n <= '1';
-    wait for HALFPERIOD*4;
-    Wr <= '1';
-    RS <= x"4";             -- TA_LO
-    DI <= "00000010";
-    wait for HALFPERIOD*2;
-    Wr <= '1';
-    RS <= x"5";             -- TA_HI
-    DI <= "00000000";
-    wait for HALFPERIOD*2;
-    Wr <= '1';
-    RS <= x"6";             -- TB_LO
-    DI <= "00000010";
-    wait for HALFPERIOD*2;
-    Wr <= '1';
-    RS <= x"7";             -- TB_HI
-    DI <= "00000000";
-    wait for HALFPERIOD*2;
-    Wr <= '1';
-    RS <= x"F";
-    DI <= "01000001"; -- CRB: start TIMER B, count TIMER A underflow pulses
-    wait for HALFPERIOD*2;
-    Wr <= '1';
-    RS <= x"E";
-    DI <= "00000001"; -- CRA: start TIMER A.
-    wait for HALFPERIOD*2;
-    Wr <= '0';
-    wait for HALFPERIOD*2*25; -- long one, CNT is slow
-
---     TIMER A underflow pulses while the CNT pin is held high.
-    res_n <= '0';
-    wait for HALFPERIOD*2;
-    res_n <= '1';
-    wait for HALFPERIOD*4;
-    Wr <= '1';
-    RS <= x"4";             -- TA_LO
-    DI <= "00000010";
-    wait for HALFPERIOD*2;
-    Wr <= '1';
-    RS <= x"5";             -- TA_HI
-    DI <= "00000000";
-    wait for HALFPERIOD*2;
-    Wr <= '1';
-    RS <= x"6";             -- TB_LO
-    DI <= "00000010";
-    wait for HALFPERIOD*2;
-    Wr <= '1';
-    RS <= x"7";             -- TB_HI
-    DI <= "00000000";
-    wait for HALFPERIOD*2;
-    Wr <= '1';
-    RS <= x"F";
-    DI <= "01100001"; -- CRB: start TIMER B, count TIMER A underflow pulses
-                      -- when CNT is high.
-    wait for HALFPERIOD*2;
-    Wr <= '1';
-    RS <= x"E";
-    DI <= "00000001"; -- CRA: start TIMER A.
-    wait for HALFPERIOD*2;
-    Wr <= '0';
-    wait for HALFPERIOD*2*70; -- long one, CNT is slow
-
---  4. The timer latch is loaded into the timer on any timer
---     underflow, on a force load or following a write to the high
---     byte of the prescaler while the timer is stopped.
--- => tested correct beh when writing to high byte while timer is stopped.
-
---  5. If the timer is running, a write to the high byte will load the
---     timer latch, but not reload the counter.
-    res_n <= '0';
-    wait for HALFPERIOD*2;
-    res_n <= '1';
-    wait for HALFPERIOD*4;
-    Wr <= '1';
-    RS <= x"4";             -- TA_LO
-    DI <= "00000110";
-    wait for HALFPERIOD*2;
-    Wr <= '1';
-    RS <= x"5";             -- TA_HI
-    DI <= "00000000";
-    wait for HALFPERIOD*2;
-    Wr <= '1';
-    RS <= x"6";             -- TB_LO
-    DI <= "00000110";
-    wait for HALFPERIOD*2;
-    Wr <= '1';
-    RS <= x"7";             -- TB_HI
-    DI <= "00000000";
-    wait for HALFPERIOD*2;
-    Wr <= '1';
-    RS <= x"F";
-    DI <= "00000001"; -- CRB: start TIMER B
-    wait for HALFPERIOD*2;
-    Wr <= '1';
-    RS <= x"E";
-    DI <= "00000001"; -- CRA: start TIMER A.
-    wait for HALFPERIOD*2;
-    Wr <= '0';
-    wait for HALFPERIOD*2*10;
-    Wr <= '1';
-    RS <= x"4";             -- TA_LO
-    DI <= "00001110";
-    wait for HALFPERIOD*2;
-    Wr <= '1';
-    RS <= x"5";             -- TA_HI
-    DI <= "00000000";
-    wait for HALFPERIOD*2;
-    Wr <= '1';
-    RS <= x"6";             -- TB_LO
-    DI <= "00001110";
-    wait for HALFPERIOD*2;
-    Wr <= '1';
-    RS <= x"7";             -- TB_HI
-    DI <= "00000000";
-    wait for HALFPERIOD*2*10;
-
-    res_n <= '0';
-    wait for HALFPERIOD*2;
-    res_n <= '1';
-    wait for HALFPERIOD*4;
+-----------    Wr <= '1';
+-----------    RS <= x"E";
+-----------    DI <= "00000001"; -- start A
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '0';
+-----------    wait for HALFPERIOD*2*6;
+-----------    Wr <= '1';
+-----------    RS <= x"F";
+-----------    DI <= "00000000"; -- stop B
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '1';
+-----------    RS <= x"E";
+-----------    DI <= "00000000"; -- stop A
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '0';
+-----------    wait for HALFPERIOD*2*6;
+-----------
+-----------
+------------- test one-shot mode, verify output toggle
+-----------    res_n <= '0';
+-----------    wait for HALFPERIOD*2;
+-----------    res_n <= '1';
+-----------    wait for HALFPERIOD*4;
+-----------    Wr <= '1';
+-----------    RS <= x"4";             -- TA_LO
+-----------    DI <= "00001010";
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '1';
+-----------    RS <= x"5";             -- TA_HI (timerA auto loads after this write)
+-----------    DI <= "00000000";
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '1';
+-----------    RS <= x"6";             -- TB_LO
+-----------    DI <= "00001010";
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '1';
+-----------    RS <= x"7";             -- TB_HI (timerB auto loads after this write)
+-----------    DI <= "00000000";       -- therefor TB_LO was written before TB_HI
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '0';
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '1';
+-----------    RS <= x"F";
+-----------    DI <= "00001011"; -- CRB: start, pb-on, pulse, one-shot
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '1';
+-----------    RS <= x"E";
+-----------    DI <= "00001011"; -- CRA: same
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '0';
+-----------    wait for HALFPERIOD*2*4;
+-----------    -- timer still running, do force loads.
+-----------    Wr <= '1';
+-----------    RS <= x"F";
+-----------    DI <= "00011011";
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '1';
+-----------    RS <= x"E";
+-----------    DI <= "00011011";
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '0';
+-----------    wait for HALFPERIOD*2*35;
+-----------    Wr <= '1';
+-----------    RS <= x"F";
+-----------    DI <= "00011011";
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '1';
+-----------    RS <= x"E";
+-----------    DI <= "00011011";
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '0';
+-----------    wait for HALFPERIOD*2*25;
+-----------
+-----------
+------------- toggle or single phi2-period pulses on timer underflow
+-----------    res_n <= '0';
+-----------    wait for HALFPERIOD*2;
+-----------    res_n <= '1';
+-----------    wait for HALFPERIOD*4;
+-----------    Wr <= '1';
+-----------    RS <= x"4";             -- TA_LO
+-----------    DI <= "00000011";
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '1';
+-----------    RS <= x"5";             -- TA_HI (timerA auto loads after this write)
+-----------    DI <= "00000000";
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '1';
+-----------    RS <= x"6";             -- TB_LO
+-----------    DI <= "00000011";
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '1';
+-----------    RS <= x"7";             -- TB_HI (timerB auto loads after this write)
+-----------    DI <= "00000000";       -- therefor TB_LO was written before TB_HI
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '0';
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '1';
+-----------    RS <= x"F";
+-----------    DI <= "00000011"; -- CRB: start, pb-on, pulse, continuous
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '1';
+-----------    RS <= x"E";
+-----------    DI <= "00000011"; -- CRA: same
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '0';
+-----------    wait for HALFPERIOD*2*15;
+-----------    Wr <= '1';
+-----------    RS <= x"F";
+-----------    DI <= "00000111"; -- CRB: start, pb-on, toggles, continuous
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '1';
+-----------    RS <= x"E";
+-----------    DI <= "00000111"; -- CRA: same
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '0';
+-----------    wait for HALFPERIOD*2*15;
+-----------
+-----------    res_n <= '0';
+-----------    wait for HALFPERIOD*2;
+-----------    res_n <= '1';
+-----------    wait for HALFPERIOD*4;
+-----------
+-------------  2. TIMER A can count 02 clock pulses
+-------------  => tested ok above
+-----------
+-------------     or external pulses applied to the CNT pin. (testing B here also)
+-----------    res_n <= '0';
+-----------    wait for HALFPERIOD*2;
+-----------    res_n <= '1';
+-----------    wait for HALFPERIOD*4;
+-----------    Wr <= '1';
+-----------    RS <= x"4";             -- TA_LO
+-----------    DI <= "00000011";
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '1';
+-----------    RS <= x"5";             -- TA_HI
+-----------    DI <= "00000000";
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '1';
+-----------    RS <= x"6";             -- TB_LO
+-----------    DI <= "00000011";
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '1';
+-----------    RS <= x"7";             -- TB_HI
+-----------    DI <= "00000000";
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '1';
+-----------    RS <= x"F";
+-----------    DI <= "00100001"; -- CRB: start and count using CNT
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '1';
+-----------    RS <= x"E";
+-----------    DI <= "00100001"; -- CRA: same
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '0';
+-----------    wait for HALFPERIOD*2*300; -- long one, CNT is slow
+-----------
+-------------  3. TIMER B can count 02 pulses, external CNT pulses,
+-------------  => tested OK.
+-----------
+-------------     TIMER B can count TIMER A underflow pulses
+-----------    res_n <= '0';
+-----------    wait for HALFPERIOD*2;
+-----------    res_n <= '1';
+-----------    wait for HALFPERIOD*4;
+-----------    Wr <= '1';
+-----------    RS <= x"4";             -- TA_LO
+-----------    DI <= "00000010";
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '1';
+-----------    RS <= x"5";             -- TA_HI
+-----------    DI <= "00000000";
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '1';
+-----------    RS <= x"6";             -- TB_LO
+-----------    DI <= "00000010";
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '1';
+-----------    RS <= x"7";             -- TB_HI
+-----------    DI <= "00000000";
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '1';
+-----------    RS <= x"F";
+-----------    DI <= "01000001"; -- CRB: start TIMER B, count TIMER A underflow pulses
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '1';
+-----------    RS <= x"E";
+-----------    DI <= "00000001"; -- CRA: start TIMER A.
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '0';
+-----------    wait for HALFPERIOD*2*25; -- long one, CNT is slow
+-----------
+-------------     TIMER A underflow pulses while the CNT pin is held high.
+-----------    res_n <= '0';
+-----------    wait for HALFPERIOD*2;
+-----------    res_n <= '1';
+-----------    wait for HALFPERIOD*4;
+-----------    Wr <= '1';
+-----------    RS <= x"4";             -- TA_LO
+-----------    DI <= "00000010";
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '1';
+-----------    RS <= x"5";             -- TA_HI
+-----------    DI <= "00000000";
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '1';
+-----------    RS <= x"6";             -- TB_LO
+-----------    DI <= "00000010";
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '1';
+-----------    RS <= x"7";             -- TB_HI
+-----------    DI <= "00000000";
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '1';
+-----------    RS <= x"F";
+-----------    DI <= "01100001"; -- CRB: start TIMER B, count TIMER A underflow pulses
+-----------                      -- when CNT is high.
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '1';
+-----------    RS <= x"E";
+-----------    DI <= "00000001"; -- CRA: start TIMER A.
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '0';
+-----------    wait for HALFPERIOD*2*70; -- long one, CNT is slow
+-----------
+-------------  4. The timer latch is loaded into the timer on any timer
+-------------     underflow, on a force load or following a write to the high
+-------------     byte of the prescaler while the timer is stopped.
+------------- => tested correct beh when writing to high byte while timer is stopped.
+-----------
+-------------  5. If the timer is running, a write to the high byte will load the
+-------------     timer latch, but not reload the counter.
+-----------    res_n <= '0';
+-----------    wait for HALFPERIOD*2;
+-----------    res_n <= '1';
+-----------    wait for HALFPERIOD*4;
+-----------    Wr <= '1';
+-----------    RS <= x"4";             -- TA_LO
+-----------    DI <= "00000110";
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '1';
+-----------    RS <= x"5";             -- TA_HI
+-----------    DI <= "00000000";
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '1';
+-----------    RS <= x"6";             -- TB_LO
+-----------    DI <= "00000110";
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '1';
+-----------    RS <= x"7";             -- TB_HI
+-----------    DI <= "00000000";
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '1';
+-----------    RS <= x"F";
+-----------    DI <= "00000001"; -- CRB: start TIMER B
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '1';
+-----------    RS <= x"E";
+-----------    DI <= "00000001"; -- CRA: start TIMER A.
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '0';
+-----------    wait for HALFPERIOD*2*10;
+-----------    Wr <= '1';
+-----------    RS <= x"4";             -- TA_LO
+-----------    DI <= "00001110";
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '1';
+-----------    RS <= x"5";             -- TA_HI
+-----------    DI <= "00000000";
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '1';
+-----------    RS <= x"6";             -- TB_LO
+-----------    DI <= "00001110";
+-----------    wait for HALFPERIOD*2;
+-----------    Wr <= '1';
+-----------    RS <= x"7";             -- TB_HI
+-----------    DI <= "00000000";
+-----------    wait for HALFPERIOD*2*10;
+-----------
+-----------    res_n <= '0';
+-----------    wait for HALFPERIOD*2;
+-----------    res_n <= '1';
+-----------    wait for HALFPERIOD*4;
 
 --   Wr <= '0';
 
@@ -484,7 +538,8 @@ P_CNT_0: process
  --   RS <= x"F";
  --   DI <= "01000001";
  --   wait for HALFPERIOD*2;
-
+    wait until rising_edge(PHI2);
+    run <= false;
     wait;
   end process;
 
