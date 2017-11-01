@@ -1,6 +1,6 @@
+
 library ieee;
 use ieee.std_logic_1164.all;
-
 use work.base_pck.all;
 
 entity tb_timer is
@@ -8,6 +8,7 @@ entity tb_timer is
 end tb_timer;
 
 architecture behaviour of tb_timer is
+
   component timerA is
   port ( 
 -- DATA AND CONTROL
@@ -65,13 +66,13 @@ architecture behaviour of tb_timer is
   
 begin
   -- on the top structure RW is decoded into Rd and Wr
-  Rd <=     RW and not CS_N;
-  Wr <= not RW and not CS_N;
+  -- Rd <=     RW and not CS_N;
+  -- Wr <= not RW and not CS_N;
 
   UUT_TMRA: entity work.timerA(rtl)
     port map (
       PHI2           => PHI2,
-      DI             => TMRA_DI,
+      DI             => DI,
       DO             => TMRA_DO,
       RS             => RS,
       RES_N          => RES_N,
@@ -87,7 +88,7 @@ begin
   UUT_TMRB: entity work.timerB(rtl)
     port map (
       PHI2           => PHI2,
-      DI             => TMRB_DI,
+      DI             => DI,
       DO             => TMRB_DO,
       RS             => RS,
       RES_N          => RES_N,
@@ -130,7 +131,8 @@ begin
     -- init at time zero
     RES_N <= '1';
     CS_N  <= '1';
-    RW    <= '1';
+    Rd    <= '0';
+    Wr    <= '0';
     DI <= (others => '0');
     RS    <= x"0";
     wait until rising_edge(PHI2);
@@ -142,15 +144,17 @@ begin
 -----------    wait for HALFPERIOD*3;
 -----------    res_n <= '1';
 -----------    wait for HALFPERIOD*4;
-reset_proc(PHI2, RES_N);
-nop_proc(PHI2, 4);
+  reset_proc(PHI2, RES_N);
+  nop_proc(PHI2, 4);
 
 -----------    Wr <= '1';
 -----------    RS <= x"F";
 -----------    DI <= "00000001"; -- start B
 -----------    wait for HALFPERIOD*2;
-bus_proc(PHI2,CS_N,RW,DI,RS,'1',"00000001",x"F");
-nop_proc(PHI2, 4);
+  print("Start TMRB");
+  module_write_proc(PHI2,DI,RS,Wr,x"F",data=>"00000001");
+  module_read_proc(PHI2,TMRB_DO,RS,Rd,x"F",expected=>"00000001");
+  nop_proc(PHI2, 2);
 
 -----------    Wr <= '1';
 -----------    RS <= x"E";
@@ -158,39 +162,102 @@ nop_proc(PHI2, 4);
 -----------    wait for HALFPERIOD*2;
 -----------    Wr <= '0';
 -----------    wait for HALFPERIOD*2*6;
+  print("Start TMRA");
+  module_write_proc(PHI2,DI,RS,Wr,x"E",data=>"00000001");
+  module_read_proc(PHI2,TMRA_DO,RS,Rd,x"E",expected=>"00000001");
+  nop_proc(PHI2, 8);
+  
 -----------    Wr <= '1';
 -----------    RS <= x"F";
 -----------    DI <= "00000000"; -- stop B
 -----------    wait for HALFPERIOD*2;
------------    Wr <= '1';
------------    RS <= x"E";
------------    DI <= "00000000"; -- stop A
------------    wait for HALFPERIOD*2;
------------    Wr <= '0';
------------    wait for HALFPERIOD*2*6;
------------
------------
-------------- test one-shot mode, verify output toggle
------------    res_n <= '0';
------------    wait for HALFPERIOD*2;
------------    res_n <= '1';
------------    wait for HALFPERIOD*4;
------------    Wr <= '1';
------------    RS <= x"4";             -- TA_LO
------------    DI <= "00001010";
------------    wait for HALFPERIOD*2;
------------    Wr <= '1';
------------    RS <= x"5";             -- TA_HI (timerA auto loads after this write)
------------    DI <= "00000000";
------------    wait for HALFPERIOD*2;
+  print("Stop TMRB");
+  module_write_proc(PHI2,DI,RS,Wr,x"F",data=>"00000000");
+  module_read_proc(PHI2,TMRA_DO,RS,Rd,x"F",expected=>"00000000");
+  nop_proc(PHI2, 2);
+
+--    Wr <= '1';
+--    RS <= x"E";
+--    DI <= "00000000"; -- stop A
+--    wait for HALFPERIOD*2;
+--    Wr <= '0';
+--    wait for HALFPERIOD*2*6;
+  print("Stop TMRA");
+  module_write_proc(PHI2,DI,RS,Wr,x"E",data=>"00000000");
+  module_read_proc(PHI2,TMRA_DO,RS,Rd,x"E",expected=>"00000000");
+  nop_proc(PHI2, 2);
+
+  -- Check TMRA and TMRB values
+  print("Check TIMER values");
+  module_read_proc(PHI2,TMRA_DO,RS,Rd,x"4",expected=>x"F1");
+  nop_proc(PHI2, 1);
+  module_read_proc(PHI2,TMRA_DO,RS,Rd,x"5",expected=>x"FF");
+
+  print("Wait for a while");
+  nop_proc(PHI2, 100);
+  print("Verify timer stopped");
+  module_read_proc(PHI2,TMRB_DO,RS,Rd,x"6",expected=>x"F1");
+  module_read_proc(PHI2,TMRB_DO,RS,Rd,x"7",expected=>x"FF");
+  nop_proc(PHI2, 1);
+
+  -- Verify timer stopped
+  print("Verify timer stopped");
+  module_read_proc(PHI2,TMRA_DO,RS,Rd,x"4",expected=>x"F1");
+  nop_proc(PHI2, 1);
+  module_read_proc(PHI2,TMRA_DO,RS,Rd,x"5",expected=>x"FF");
+  nop_proc(PHI2, 1);
+  module_read_proc(PHI2,TMRB_DO,RS,Rd,x"6",expected=>x"F1");
+  nop_proc(PHI2, 1);
+  module_read_proc(PHI2,TMRB_DO,RS,Rd,x"7",expected=>x"FF");
+  nop_proc(PHI2, 1);
+
+
+  ---- test one-shot mode, verify output toggle
+
+--    res_n <= '0';
+--    wait for HALFPERIOD*2;
+--    res_n <= '1';
+--    wait for HALFPERIOD*4;
+  reset_proc(PHI2, RES_N);
+  nop_proc(PHI2, 1);
+
+--  Wr <= '1';
+--  RS <= x"4";             -- Write to TA_LO (TMRA latch low)
+--  DI <= "00001010";
+--  wait for HALFPERIOD*2;
+  print("Write TA_LO.");
+  module_write_proc(PHI2,DI,RS,Wr,x"4",data=>x"0A");
+-- note: You can't read TA_LO. A read at x"4" returns TMRA_LO.
+  module_read_proc(PHI2,TMRA_DO,RS,Rd,x"4",expected=>x"FF");
+  module_read_proc(PHI2,TMRA_DO,RS,Rd,x"5",expected=>x"FF");
+  
+--  Wr <= '1';
+--  RS <= x"5";        -- TA_HI. TMRA auto loads after this write.
+--  DI <= "00000000";
+--  wait for HALFPERIOD*2;
+  print("Write TA_HI. TMRA loads latch");
+  module_write_proc(PHI2,DI,RS,Wr,x"5",data=>x"02");
+  module_read_proc(PHI2,TMRA_DO,RS,Rd,x"4",expected=>x"0A");
+  module_read_proc(PHI2,TMRA_DO,RS,Rd,x"5",expected=>x"02");
+
 -----------    Wr <= '1';
 -----------    RS <= x"6";             -- TB_LO
 -----------    DI <= "00001010";
 -----------    wait for HALFPERIOD*2;
+  print("Write TB_LO.");
+  module_write_proc(PHI2,DI,RS,Wr,x"6",data=>x"0A");
+  module_read_proc(PHI2,TMRB_DO,RS,Rd,x"6",expected=>x"FF");
+  module_read_proc(PHI2,TMRB_DO,RS,Rd,x"7",expected=>x"FF");
+
 -----------    Wr <= '1';
 -----------    RS <= x"7";             -- TB_HI (timerB auto loads after this write)
 -----------    DI <= "00000000";       -- therefor TB_LO was written before TB_HI
 -----------    wait for HALFPERIOD*2;
+  print("Write TB_HI. TMRB loads latch");
+  module_write_proc(PHI2,DI,RS,Wr,x"7",data=>x"02");
+  module_read_proc(PHI2,TMRB_DO,RS,Rd,x"6",expected=>x"0A");
+  module_read_proc(PHI2,TMRB_DO,RS,Rd,x"7",expected=>x"02");
+
 -----------    Wr <= '0';
 -----------    wait for HALFPERIOD*2;
 -----------    Wr <= '1';
@@ -203,21 +270,106 @@ nop_proc(PHI2, 4);
 -----------    wait for HALFPERIOD*2;
 -----------    Wr <= '0';
 -----------    wait for HALFPERIOD*2*4;
+  print("Start TMRA and TMRB, PB_ON, PULSE, ONE-SHOT");
+  assert TMRA_PB_ON_EN = '0' report "TMRA_PB_ON not 0" severity failure;
+  assert TMRB_PB_ON_EN = '0' report "TMRB_PB_ON not 0" severity failure;
+  module_write_proc(PHI2,DI,RS,Wr,x"F",data=>"00001011"); -- start
+  module_write_proc(PHI2,DI,RS,Wr,x"E",data=>"00001011"); -- start
+  module_read_proc(PHI2,TMRB_DO,RS,Rd,x"F",expected=>"00001011");
+  module_read_proc(PHI2,TMRA_DO,RS,Rd,x"E",expected=>"00001011");
+  nop_proc(PHI2, 1);
+  assert TMRA_OUT = '0' report "TMRA_OUT not 0" severity failure;
+  assert TMRB_OUT = '0' report "TMRB_OUT not 0" severity failure;
+  assert TMRA_UNDERFLOW = '0' report "TMRA_UNDERFLOW not 0" severity failure;
+
+  -- Check TMRA and TMRB valuse
+  print("Check TMRA and TMRB");
+  module_read_proc(PHI2,TMRA_DO,RS,Rd,x"4",expected=>x"06");
+  module_read_proc(PHI2,TMRA_DO,RS,Rd,x"5",expected=>x"02");
+  module_read_proc(PHI2,TMRB_DO,RS,Rd,x"6",expected=>x"03");
+  module_read_proc(PHI2,TMRB_DO,RS,Rd,x"7",expected=>x"02");
+  assert TMRA_PB_ON_EN = '1' report "TMRA_PB_ON not 1" severity failure;
+  assert TMRB_PB_ON_EN = '1' report "TMRB_PB_ON not 1" severity failure;
+
+  print("wait for rising edge TMRB_OUT (timeout)");
+  while(TMRB_OUT = '0') loop -- wait for rising edge TMRB_OUT
+    assert TMRA_OUT = '0' report "TMRA_OUT not 0" severity failure;
+    assert TMRA_INT = '0' report "TMRA_INT not 0" severity failure;
+    assert TMRB_INT = '0' report "TMRB_INT not 0" severity failure;
+    assert TMRA_UNDERFLOW = '0' report "TMRA_UNDERFLOW not 0" severity failure;
+    wait until falling_edge(PHI2);
+  end loop;
+  
+  print("check TMRA_OUT and TMRB_OUT");
+  assert TMRA_OUT = '0' report "TMRA_OUT not 0" severity failure;
+  assert TMRB_OUT = '1' report "TMRB_OUT not 1" severity failure;
+  assert TMRA_INT = '0' report "TMRA_INT not 0" severity failure;
+  assert TMRB_INT = '1' report "TMRB_INT not 1" severity failure;
+  wait until falling_edge(PHI2);
+  assert TMRA_OUT = '1' report "TMRA_OUT not 1" severity failure;
+  assert TMRB_OUT = '0' report "TMRB_OUT not 0" severity failure;
+  assert TMRA_INT = '1' report "TMRA_INT not 1" severity failure;
+  assert TMRB_INT = '0' report "TMRB_INT not 0" severity failure;
+  wait until falling_edge(PHI2);
+  assert TMRA_OUT = '0' report "TMRA_OUT not 0" severity failure;
+  assert TMRB_OUT = '0' report "TMRB_OUT not 0" severity failure;
+  assert TMRA_INT = '0' report "TMRA_INT not 0" severity failure;
+  assert TMRB_INT = '0' report "TMRB_INT not 0" severity failure;
+  print("check TMRA and TMRB reloaded");
+  module_read_proc(PHI2,TMRA_DO,RS,Rd,x"4",expected=>x"0A");
+  module_read_proc(PHI2,TMRA_DO,RS,Rd,x"5",expected=>x"02");
+  module_read_proc(PHI2,TMRB_DO,RS,Rd,x"6",expected=>x"0A");
+  module_read_proc(PHI2,TMRB_DO,RS,Rd,x"7",expected=>x"02");
+  nop_proc(PHI2, 10);
+  print("check TMRA and TMRB stopped (one-shot)");
+  module_read_proc(PHI2,TMRA_DO,RS,Rd,x"4",expected=>x"0A");
+  module_read_proc(PHI2,TMRA_DO,RS,Rd,x"5",expected=>x"02");
+  module_read_proc(PHI2,TMRB_DO,RS,Rd,x"6",expected=>x"0A"); -- check stopped
+  module_read_proc(PHI2,TMRB_DO,RS,Rd,x"7",expected=>x"02"); -- and reloaded
+  assert CRB_ALARM = '0' report "CRB_ALARM not 0" severity failure;
+
+--  nop_proc(PHI2, 1);
+  
 -----------    -- timer still running, do force loads.
 -----------    Wr <= '1';
 -----------    RS <= x"F";
------------    DI <= "00011011";
+-----------    DI <= "00011011"; -- CRB: force load, pb_on, pulse, one-shot
 -----------    wait for HALFPERIOD*2;
+
+-- "timer still running" this older comment is conflicting. The timer is
+-- not running. Perhaps what is meant is "when the timer wraps, do a reload"
+-- but then again we have the "force load" bit set on CRB. Double conflict.
+-- ok so accoring to the following, this CRB is a "strobe bit", meaning that
+-- when set it will automatially clear, and also the TMR will load from latch.
+--   "Force Load: tested ok
+--   A strobe bit allows the timer latch to be loaded into the
+--   timer counter at any time, whether the timer is running or
+--   not."
+-- Since the timer was stopped by one-shot mode above, the value has already
+-- been loaded. We can check that ofcourse, then restart it, stop it,
+-- then start with force-load bit and check again.
+  print("Start TMRA and TMRB. force load, pb_on, pulse, one-shot");
+
+  module_write_proc(PHI2,DI,RS,Wr,x"F",data=>"00011011"); -- start
+  module_write_proc(PHI2,DI,RS,Wr,x"E",data=>"00011011"); -- start
+  module_read_proc(PHI2,TMRB_DO,RS,Rd,x"F",expected=>"00001011");
+  module_read_proc(PHI2,TMRA_DO,RS,Rd,x"E",expected=>"00001011");
+  wait for 0.1 ms;
+  run <= false;
+  wait;
+  
 -----------    Wr <= '1';
 -----------    RS <= x"E";
------------    DI <= "00011011";
+-----------    DI <= "00011011"; -- CRA: same
 -----------    wait for HALFPERIOD*2;
 -----------    Wr <= '0';
 -----------    wait for HALFPERIOD*2*35;
+
 -----------    Wr <= '1';
 -----------    RS <= x"F";
 -----------    DI <= "00011011";
 -----------    wait for HALFPERIOD*2;
+
 -----------    Wr <= '1';
 -----------    RS <= x"E";
 -----------    DI <= "00011011";
