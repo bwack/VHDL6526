@@ -68,7 +68,7 @@ package body base_pck is
   procedure nop_proc ( signal PHI2   : in std_logic;
                        cycles        : in positive := 1) is
   begin
-    print("nop_proc");
+    --print("nop_proc");
     for i in 1 to cycles loop
       wait until rising_edge(PHI2);
     end loop;
@@ -83,7 +83,7 @@ package body base_pck is
                        address     : in std_logic_vector(3 downto 0);
                        expected    : in std_logic_vector(7 downto 0)                       ) is
   begin
-    print("module_read_proc");
+    --print("module_read_proc");
     --PHI2 <= '0';
     --wait for 100 ns;
     Rd <= '1';
@@ -92,7 +92,7 @@ package body base_pck is
     --wait for 390 ns;
     wait until falling_edge(PHI2);
     --PHI2 <= '1';
-    assert DO = expected report "not expected"
+    assert DO = expected report "DO " & integer'image(to_integer(unsigned(DO))) & " not expected " & integer'image(to_integer(unsigned(expected)))
       severity failure;
     --wait for HALFPERIOD*0.9;
     --PHI2 <= '0';
@@ -112,7 +112,7 @@ package body base_pck is
                        constant data    : in std_logic_vector(7 downto 0)
                  ) is
   begin
-    print("module_write_proc");
+    --print("module_write_proc");
     --PHI2 <= '0';
     --wait for 100 ns;
     Wr <= '1';
@@ -170,7 +170,7 @@ package body base_pck is
   procedure print( str : string ) is
     variable my_line : line;
   begin
-    write(my_line, str);
+    write(my_line, time'IMAGE(now) & " " & str);
     writeline(output, my_line);
   end print;
   
