@@ -7,20 +7,23 @@ entity timerB is
 -- The timer decrements.
   port ( 
 -- DATA AND CONTROL
-    PHI2    : in  std_logic; -- clock 1MHz
-    DI      : in  std_logic_vector(7 downto 0);
-    DO      : out std_logic_vector(7 downto 0);
-    RS      : in  std_logic_vector(3 downto 0); -- address - register select
-    RES_N   : in  std_logic; -- global reset
-    Rd, Wr  : in  std_logic; -- read and write registers
+    PHI2              : in  std_logic; -- clock 1MHz
+    DI                : in  std_logic_vector(7 downto 0);
+    DO                : out std_logic_vector(7 downto 0);
+    RES_N             : in  std_logic; -- global reset
+    Wr                : in  std_logic;
+-- register strobes
+    TMRB_REG_TIMER_LO : in  std_logic; -- address 6
+    TMRB_REG_TIMER_HI : in  std_logic; -- address 7
+    TMRB_REG_CONTROL  : in  std_logic; -- address f
 -- INPUTS
-    CNT            : in  std_logic; -- counter
-    TMRA_UNDERFLOW : in std_logic; -- underflow pulses from timer A.
+    CNT               : in  std_logic; -- counter
+    TMRA_UNDERFLOW    : in std_logic; -- underflow pulses from timer A.
 -- OUTPUTS
-    TMR_OUT        : out std_logic; -- timer B output to PORTB
-    PB_ON_EN       : out std_logic; -- enable timer B output on PB7 else PB7 is I/O
-    ALARM          : out std_logic; -- CRB_ALARM forwarding to tod
-    INT            : out std_logic
+    TMR_OUT           : out std_logic; -- timer B output to PORTB
+    PB_ON_EN          : out std_logic; -- enable timer B output on PB7 else PB7 is I/O
+    ALARM             : out std_logic; -- CRB_ALARM forwarding to tod
+    INT               : out std_logic
   );
 end entity timerB;
 
@@ -52,7 +55,6 @@ architecture rtl of timerB is
   signal underflow_flag : std_logic;
   signal old_underflow  : std_logic;
   --signal old_start      : std_logic;
-  signal read_flag : std_logic; -- tristate control of DO
   signal mydebug : std_logic;
 
 begin 
@@ -63,9 +65,7 @@ begin
   INT      <= underflow_flag and not old_underflow;
   ALARM    <= CRB_ALARM;
 
-  enable <= '1' when Rd = '1' and (RS=x"6" or RS=x"7" or RS=x"F") else '0';
   DO <= data_out;
-  --DI <= DB;
 
   timertoggle: process(PHI2,RES_N,underflow_flag)
     variable old_start : std_logic ;
@@ -136,52 +136,38 @@ begin
       CRB_PBON    <= '0';
       CRB_OUTMODE <= '0';
       CRB_RUNMODE <= '0';
-      CRB_LOAD   <= '0';
-      CRB_INMODE <= "00";
-      CRB_ALARM  <= '0';
+      CRB_LOAD    <= '0';
+      CRB_INMODE  <= "00";
+      CRB_ALARM   <= '0';
     elsif falling_edge(PHI2) then
       CRB_LOAD <= '0';
       if CRB_RUNMODE = '1' and underflow_flag = '1' then
         CRB_START <= '0';
       end if;
       if Wr = '1' then 
-        case RS is
-          when x"6" => TB_LO <= DI;
-          when x"7" => TB_HI <= DI;
-          when x"F" => CRB_ALARM     <= DI(7);
-                       CRB_INMODE(1) <= DI(6);
-                       CRB_INMODE(0) <= DI(5);
-                       CRB_LOAD      <= DI(4);
-                       CRB_RUNMODE   <= DI(3);
-                       CRB_OUTMODE   <= DI(2);
-                       CRB_PBON      <= DI(1);
-                       CRB_START     <= DI(0);
-          when others => null;
-        end case;
-        if RS = x"7" and CRB_START = '0' then
-          CRB_LOAD <= '1';
+        if TMRB_REG_TIMER_LO = '1' then
+          TB_LO <= DI;
+        end if;
+        if TMRB_REG_TIMER_HI = '1' then
+          TB_HI <= DI;
+          if CRB_START = '0' then
+            CRB_LOAD <= '1';
+          end if;
+        end if;
+        if TMRB_REG_CONTROL = '1' then
+          CRB_ALARM     <= DI(7);
+          CRB_INMODE(1) <= DI(6);
+          CRB_INMODE(0) <= DI(5);
+          CRB_LOAD      <= DI(4);
+          CRB_RUNMODE   <= DI(3);
+          CRB_OUTMODE   <= DI(2);
+          CRB_PBON      <= DI(1);
+          CRB_START     <= DI(0);
         end if;
       end if;
     end if;
   end process;
 
-
--- READ REGISTER
-  process (PHI2,RES_N) is
-  begin
-    if rising_edge(PHI2) then
-      read_flag <= '0';
-      if Rd = '1' then
-        case RS is
-          when x"6" => read_flag <= '1';
-          when x"7" => read_flag <= '1';
-          when x"F" => read_flag <= '1';
-          when others => null;
-        end case;
-      end if;
-    end if;
-  end process;
-  
   CRB_REG <= (
                 CRB_ALARM   &
                 CRB_INMODE  &
@@ -191,12 +177,18 @@ begin
                 CRB_PBON    &
                 CRB_START  );
 
-  with RS select
-    data_out <= TMRB( 7 downto 0) when x"6",
-                TMRB(15 downto 8) when x"7",
-                CRB_REG when x"F",
-                (others => '0') when others;
-               
-  
+  tmrb_data_out: process (TMRB_REG_TIMER_LO, TMRB_REG_TIMER_HI, TMRB_REG_CONTROL) is
+  begin
+    if TMRB_REG_TIMER_LO = '1' then
+      data_out <= TMRB( 7 downto 0);
+    elsif TMRB_REG_TIMER_HI = '1' then
+      data_out <= TMRB( 15 downto 8);
+    elsif TMRB_REG_CONTROL = '1' then
+      data_out <= CRB_REG;
+    else
+      data_out <= (others => '0');
+    end if;
+  end process;
+
 end architecture;
 

@@ -7,13 +7,15 @@ entity timerA is
 -- The timer decrements.
   port ( 
 -- DATA AND CONTROL
-    PHI2    : in  std_logic; -- clock 1MHz
-    DI      : in  std_logic_vector(7 downto 0);
-    DO      : out std_logic_vector(7 downto 0);
-    RS      : in  std_logic_vector(3 downto 0); -- address - register select
-    RES_N   : in  std_logic; -- global reset
-    Rd, Wr  : in  std_logic; -- read and write registers
---  Rd and Wr are driven by CS_N and Rd/Wr in the chip access control
+    PHI2              : in  std_logic; -- clock 1MHz
+    DI                : in  std_logic_vector(7 downto 0);
+    DO                : out std_logic_vector(7 downto 0);
+    RES_N             : in  std_logic; -- global reset
+    Wr                : in  std_logic; -- read and write registers
+-- register strobes
+    TMRA_REG_TIMER_LO : in  std_logic; -- address 4
+    TMRA_REG_TIMER_HI : in  std_logic; -- address 5
+    TMRA_REG_CONTROL  : in  std_logic; -- address e
 -- INPUTS
     CNT            : in std_logic; -- counter
 -- OUTPUTS
@@ -49,7 +51,6 @@ architecture rtl of timerA is
 -- flags and other data
   signal underflow_flag : std_logic;
   signal old_underflow  : std_logic;
-  signal read_flag : std_logic; -- tristate control of DO
 
 begin
 
@@ -63,9 +64,9 @@ begin
   TODIN          <= CRA_TODIN;
 --  DO <= data when Rd = '1' else (others => 'Z');
 
-  enable <= '1' when Rd = '1' and (RS=x"4" or RS=x"5" or RS=x"E") else '0';
+  --enable <= '1' when Wr = '0' and (RS=x"4" or RS=x"5" or RS=x"E") else '0';
   DO <= data_out;
-  --DI <= DB;
+
 
 
   timertoggle: process(PHI2,RES_N,CRA_START,underflow_flag)
@@ -102,7 +103,7 @@ begin
     TMRCLOCK <= PHI2 when CRA_INMODE = '0' else CNTSYNCED;
 
 -- TIMER
-  timerA: process (TMRCLOCK,RES_N,CRA_LOAD) is
+  timerA: process (TMRCLOCK,RES_N,CRA_LOAD,TA_HI,TA_LO) is
   begin
     if RES_N = '0' then
       TMRA <= x"ffff";
@@ -120,7 +121,15 @@ begin
     end if;
   end process timerA;
 
--- WRITE REGISTERS
+  CRA_REG <= ( CRA_TODIN   &
+               CRA_SPMODE  &
+               CRA_INMODE  &
+               '0'         &
+               CRA_RUNMODE &
+               CRA_OUTMODE &
+               CRA_PBON    &
+               CRA_START  );
+  
   process (PHI2,RES_N) is
   begin
     if RES_N = '0' then
@@ -140,69 +149,40 @@ begin
         CRA_START <= '0';
       end if;
       if Wr = '1' then 
-        case RS is
-          when x"4" => TA_LO <= DI;
-          when x"5" => TA_HI <= DI;
-          when x"E" => CRA_TODIN   <= DI(7);
-                       CRA_SPMODE  <= DI(6);
-                       CRA_INMODE  <= DI(5);
-                       CRA_LOAD    <= DI(4);
-                       CRA_RUNMODE <= DI(3);
-                       CRA_OUTMODE <= DI(2);
-                       CRA_PBON    <= DI(1);
-                       CRA_START   <= DI(0);
-          when others => null;
-        end case;
-        if RS = x"5" and CRA_START = '0' then
-          CRA_LOAD <= '1';
+        if TMRA_REG_TIMER_LO = '1' then
+          TA_LO <= DI;
+        end if;
+        if TMRA_REG_TIMER_HI = '1' then
+          TA_HI <= DI;
+          if CRA_START = '0' then
+            CRA_LOAD <= '1';
+          end if;
+        end if;
+        if TMRA_REG_CONTROL = '1' then
+          CRA_TODIN   <= DI(7);
+          CRA_INMODE  <= DI(5);
+          CRA_SPMODE  <= DI(6);
+          CRA_LOAD    <= DI(4);
+          CRA_RUNMODE <= DI(3);
+          CRA_OUTMODE <= DI(2);
+          CRA_PBON    <= DI(1);
+          CRA_START   <= DI(0);
         end if;
       end if;
     end if;
   end process;
 
-
--- READ REGISTER
-
-  process (PHI2,RES_N) is
+  tmra_data_out: process (TMRA_REG_TIMER_LO, TMRA_REG_TIMER_HI, TMRA_REG_CONTROL, TMRA, CRA_REG) is
   begin
-    if rising_edge(PHI2) then
-      read_flag <= '0';
-      if Rd = '1' then
-        case RS is
-          when x"4" => -- data_out <= TMRA(7 downto 0);
-                       read_flag <= '1';
-          when x"5" => -- data_out <= TMRA(15 downto 8);
-                       read_flag <= '1';
-          when x"E" => --data_out <= (
-                       --          CRA_TODIN   &
-                       --          CRA_SPMODE  &
-                       --          CRA_INMODE  &
-                       --          '0'         &
-                       --          CRA_RUNMODE &
-                       --          CRA_OUTMODE &
-                       --          CRA_PBON    &
-                       --          CRA_START  );
-                       read_flag <= '1';
-          when others => null;
-        end case;
-      end if;
+    if    TMRA_REG_TIMER_LO = '1' and TMRA_REG_TIMER_HI = '0' and TMRA_REG_CONTROL = '0' then
+      data_out <= TMRA( 7 downto 0);
+    elsif TMRA_REG_TIMER_LO = '0' and TMRA_REG_TIMER_HI = '1' and TMRA_REG_CONTROL = '0' then
+      data_out <= TMRA( 15 downto 8);
+    elsif TMRA_REG_TIMER_LO = '0' and TMRA_REG_TIMER_HI = '0' and TMRA_REG_CONTROL = '1' then
+      data_out <= CRA_REG;
+    else
+      data_out <= (others => '0');
     end if;
-  end process;
-
-  CRA_REG <= ( CRA_TODIN   &
-               CRA_SPMODE  &
-               CRA_INMODE  &
-               '0'         &
-               CRA_RUNMODE &
-               CRA_OUTMODE &
-               CRA_PBON    &
-               CRA_START  );
-  
-  with RS select
-    data_out <= TMRA( 7 downto 0) when x"4",
-                TMRA(15 downto 8) when x"5",
-                CRA_REG when x"E",
-                (others => '0') when others;
-               
+  end process;    
                 
 end architecture;
