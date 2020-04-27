@@ -19,7 +19,6 @@ entity port_a is
 end entity port_a;
 
 architecture rtla of port_a is
-  signal data_out  : std_logic_vector(7 downto 0);
   signal PA_IN     : std_logic_vector(7 downto 0);
 -- REGISTERS      
   signal PRA       : std_logic_vector(7 downto 0); -- PA0-PA7 Peripheral Data Register
@@ -69,8 +68,8 @@ begin
     end if;
   end process;
 
-  data_out <= PA   when RS = x"0" else
-              DDRA when RS = x"2" else
-              (others=>'0');
+  DO <= PA   when RS = x"0" else
+        DDRA when RS = x"2" else
+        (others=>'0');
 
 end architecture rtla;

@@ -7,15 +7,12 @@ entity timerA is
 -- The timer decrements.
   port ( 
 -- DATA AND CONTROL
-    PHI2              : in  std_logic; -- clock 1MHz
-    DI                : in  std_logic_vector(7 downto 0);
-    DO                : out std_logic_vector(7 downto 0);
-    RES_N             : in  std_logic; -- global reset
-    Wr                : in  std_logic; -- read and write registers
--- register strobes
-    TMRA_REG_TIMER_LO : in  std_logic; -- address 4
-    TMRA_REG_TIMER_HI : in  std_logic; -- address 5
-    TMRA_REG_CONTROL  : in  std_logic; -- address e
+    PHI2           : in  std_logic; -- clock 1MHz
+    DI             : in  std_logic_vector(7 downto 0);
+    DO             : out std_logic_vector(7 downto 0);
+    RS             : in  std_logic_vector(3 downto 0); -- register select
+    RES_N          : in  std_logic; -- global reset
+    Wr             : in  std_logic; -- read and write registers
 -- INPUTS
     CNT            : in std_logic; -- counter
 -- OUTPUTS
@@ -24,13 +21,14 @@ entity timerA is
     PB_ON_EN       : out std_logic; -- enable timer A output on PB6 else PB6 is I/O
     SPMODE         : out std_logic; -- CRA_SPMODE forwarding to serial port
     TODIN          : out std_logic; -- CRA_TODIN forwarding to tod
-    INT            : out std_logic
+    INT            : out std_logic;
+	abcdefgdec_n   : out std_logic_vector(7 downto 0);
+    a_n            : out std_logic_vector(3 downto 0)
   );
 end entity timerA;
 
 architecture rtl of timerA is
-  signal data_out    : std_logic_vector(7 downto 0);
-  signal enable : std_logic;
+
 -- REGISTERS
   signal TA_LO       : std_logic_vector(7 downto 0); -- TMR LATCH LOAD VALUE LO
   signal TA_HI       : std_logic_vector(7 downto 0); -- TMR LATCH LOAD VALUE HI
@@ -45,12 +43,16 @@ architecture rtl of timerA is
   signal CRA_REG     : std_logic_vector(7 downto 0); -- alias for CRA
   signal TMRA        : std_logic_vector(15 downto 0); -- read only timer counter
 -- OTHER
-  signal TMRCLOCK    : std_logic;
+  signal TICK        : std_logic;
   signal CNTSYNCED   : std_logic; -- synced to phi2
   signal TMRTOGGLE   : std_logic;
 -- flags and other data
   signal underflow_flag : std_logic;
   signal old_underflow  : std_logic;
+
+-- 7 segment
+  signal d0,d1,d2,d3  : std_logic_vector(3 downto 0);
+  signal lastrs       : std_logic_vector(11 downto 0);
 
 begin
 
@@ -62,12 +64,15 @@ begin
   INT            <= underflow_flag and not old_underflow;
   SPMODE         <= CRA_SPMODE;
   TODIN          <= CRA_TODIN;
---  DO <= data when Rd = '1' else (others => 'Z');
 
-  --enable <= '1' when Wr = '0' and (RS=x"4" or RS=x"5" or RS=x"E") else '0';
-  DO <= data_out;
+  SEG7CTRL_0: entity work.seg7ctrl(rtl)
+    generic map(3) -- 14 !
+    port map(PHI2,RES_N,d0,d1,d2,d3,abcdefgdec_n,a_n);
 
-
+	d0 <= TMRA(3 downto 0);
+	d1 <= TMRA(7 downto 4);
+	d2 <= TMRA(11 downto 8);
+	d3 <= TMRA(15 downto 12);
 
   timertoggle: process(PHI2,RES_N,CRA_START,underflow_flag)
     variable old_start : std_logic ;
@@ -93,30 +98,40 @@ begin
 
 -- Resyncing CNT is important to maintain one-cycle length underflow pulses.
   cntsync: process (PHI2,RES_N) is
+  variable old_cnt : std_logic ;
   begin
     if rising_edge(PHI2) then
+	  TICK <= '0';
       CNTSYNCED <= CNT;
+	  if CNTSYNCED = '1' and old_cnt = '0' then
+	    TICK <= '1';
+	  end if;
+      old_cnt := CNTSYNCED;
     end if;      
   end process;
 
 -- TIMER CLOCK
-    TMRCLOCK <= PHI2 when CRA_INMODE = '0' else CNTSYNCED;
+    --TMRCLOCK <= PHI2 when CRA_INMODE = '0' else CNTSYNCED;
 
 -- TIMER
-  timerA: process (TMRCLOCK,RES_N,CRA_LOAD,TA_HI,TA_LO) is
+  timerA: process (PHI2,RES_N,CRA_LOAD,TA_HI,TA_LO) is
   begin
-    if RES_N = '0' then
+  if RES_N = '0' then
       TMRA <= x"ffff";
       underflow_flag <= '0';
     elsif CRA_LOAD = '1' then
       TMRA <= TA_HI & TA_LO;
-    elsif rising_edge(TMRCLOCK) then
+    elsif rising_edge(PHI2) then
         underflow_flag <= '0';
       if TMRA = "0000000000000000" and CRA_START = '1' then
         underflow_flag <= '1';
         TMRA <= TA_HI & TA_LO;
       elsif CRA_START = '1' then
+		if CRA_INMODE = '0' then
           TMRA <= std_logic_vector(unsigned(TMRA) - 1);
+		elsif TICK = '1' then
+          TMRA <= std_logic_vector(unsigned(TMRA) - 1);
+		end if;
       end if;
     end if;
   end process timerA;
@@ -149,40 +164,30 @@ begin
         CRA_START <= '0';
       end if;
       if Wr = '1' then 
-        if TMRA_REG_TIMER_LO = '1' then
-          TA_LO <= DI;
-        end if;
-        if TMRA_REG_TIMER_HI = '1' then
-          TA_HI <= DI;
-          if CRA_START = '0' then
-            CRA_LOAD <= '1';
-          end if;
-        end if;
-        if TMRA_REG_CONTROL = '1' then
-          CRA_TODIN   <= DI(7);
-          CRA_INMODE  <= DI(5);
-          CRA_SPMODE  <= DI(6);
-          CRA_LOAD    <= DI(4);
-          CRA_RUNMODE <= DI(3);
-          CRA_OUTMODE <= DI(2);
-          CRA_PBON    <= DI(1);
-          CRA_START   <= DI(0);
+	    lastrs <= RS & lastrs(11 downto 4);
+        case RS is
+          when x"4" => TA_LO <= DI;
+          when x"5" => TA_HI <= DI;
+          when x"E" => CRA_TODIN   <= DI(7);
+                       CRA_SPMODE  <= DI(6);
+                       CRA_INMODE  <= DI(5);
+                       CRA_LOAD    <= DI(4);
+                       CRA_RUNMODE <= DI(3);
+                       CRA_OUTMODE <= DI(2);
+                       CRA_PBON    <= DI(1);
+                       CRA_START   <= DI(0);
+          when others => null;
+        end case;
+		if RS = x"5" and CRA_START = '0' then
+          CRA_LOAD <= '1';
         end if;
       end if;
     end if;
   end process;
 
-  tmra_data_out: process (TMRA_REG_TIMER_LO, TMRA_REG_TIMER_HI, TMRA_REG_CONTROL, TMRA, CRA_REG) is
-  begin
-    if    TMRA_REG_TIMER_LO = '1' and TMRA_REG_TIMER_HI = '0' and TMRA_REG_CONTROL = '0' then
-      data_out <= TMRA( 7 downto 0);
-    elsif TMRA_REG_TIMER_LO = '0' and TMRA_REG_TIMER_HI = '1' and TMRA_REG_CONTROL = '0' then
-      data_out <= TMRA( 15 downto 8);
-    elsif TMRA_REG_TIMER_LO = '0' and TMRA_REG_TIMER_HI = '0' and TMRA_REG_CONTROL = '1' then
-      data_out <= CRA_REG;
-    else
-      data_out <= (others => '0');
-    end if;
-  end process;    
-                
+  DO <= TMRA( 7 downto 0) when RS = x"4" else
+        TMRA(15 downto 8) when RS = x"5" else
+		CRA_REG when RS = x"E" else
+        (others=>'0');
+  
 end architecture;
