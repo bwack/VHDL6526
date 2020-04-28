@@ -133,8 +133,9 @@ main:
 	jsr test_1
 	jsr test_2
 	jsr test_3
+	jsr test_4
 	jsr reset_timer_a
-	jmp main
+	//jmp main
 end:
 	jmp end
 // ----------------------------------
@@ -230,7 +231,7 @@ test_1_print_timerb:
 	rts
 
 /*	function: test_2
-	Stop timera, Set timera latch, check, start-stop, check
+	Set timera latch, check, start-stop, check
 */
 test_2:
 	ldx #$05     // row
@@ -309,8 +310,8 @@ test_2_print_timera_2:
 	rts
 
 /*	function: test_3
-	timer reloads latches after underflow, check,
-	timer stops at 0000, check.
+	continuous: timer underflows, loads latches, and continues, check,
+	one-shot: timer underflows, loads latches, then stops, check.
 */
 test_3:
 	ldx #$06     // row
@@ -321,21 +322,49 @@ test_3:
 	// timer reloads latches after underflow
 	lda	#$00     // stop timera
 	sta $dc0e
-	lda #$01     // set latches
+	lda #$ff     // set latches
 	sta $dc04
 	sta $dc05
 	lda	#$01     // start timera
 	sta $dc0e
-	ldy #$30
-test3_loop:
-	dey
-	bne test3_loop
-	lda	#$00     // stop timera
-	sta $dc0e
+	
+	lda #$ff // loop ff times to show the number spinning
+test3_reload_test:
+	pha      // loop index is used further down, stacking it
 	lda $dc04    // read timera
 	sta PARAM2
 	lda $dc05
 	sta PARAM2+1
+
+	// test not ffff (timer underflowed, and reloaded #$1010)
+	lda #$0d     // lightgreen
+	sta PARAM1+1 // color
+	lda PARAM2+1
+	cmp #$ff
+	bne test_3_print_timera_1
+	lda PARAM2
+	cmp #$ff
+	bne test_3_print_timera_1
+	lda #$02     // red
+	sta PARAM1+1 // color
+test_3_print_timera_1:
+	lda PARAM2+1
+	sta PARAM1
+	ldx #$06 // row
+	ldy #$06 // column
+	jsr printhex
+	lda PARAM2
+	sta PARAM1
+	ldx #$06 // row
+	ldy #$08 // column
+	jsr printhex
+	//jsr waitvertical
+	pla
+	clc
+	adc #$ff
+	bne test3_reload_test
+	lda	#$00     // stop timera
+	sta $dc0e
 
 	// timer stops at 0000, check.
 	lda	#$00     // stop timera
@@ -361,38 +390,17 @@ test3_loop_2:
 	lda #$00     // stop timer a
 	sta $dc0e 
 
-	// test 00f8 (timer underflowed, and reloaded #$1010)
+	// test 0000 < timer < 0101 (check that it was reloading)
 	lda #$02     // red
 	sta PARAM1+1 // color
-	lda PARAM2+1
-	cmp #$00
-	bne test_3_print_timera_1
-	lda PARAM2
-	cmp #$f8
-	bne test_3_print_timera_1
-	lda #$0d     // lightgreen
-	sta PARAM1+1 // color
-test_3_print_timera_1:
-	lda PARAM2+1
-	sta PARAM1
-	ldx #$06 // row
-	ldy #$06 // column
-	jsr printhex
-	lda PARAM2
-	sta PARAM1
-	ldx #$06 // row
-	ldy #$08 // column
-	jsr printhex
-
-	// test 00fd
-	lda #$02     // red
-	sta PARAM1+1 // color
-	lda PARAM3+1
-	cmp #$00
-	bne test_3_print_timera_2
-	lda PARAM3
-	cmp #$fd
-	bne test_3_print_timera_2
+	sec
+	lda #$00     // checking PARAM3 == #$0101
+	sbc PARAM3
+	sta PARAM5
+	lda #$01        
+	sbc PARAM3+1
+	sta PARAM5+1
+    bne test_3_print_timera_2
 	lda #$0d     // lightgreen
 	sta PARAM1+1 // color
 test_3_print_timera_2:
@@ -429,6 +437,110 @@ test_3_print_timera_3:
 	ldx #$06 // row
 	ldy #$12 // column
 	jsr printhex
+	rts
+
+/*	function: test_4
+	If the timer is running, a write to the high byte will load the
+	timer latch, but not reload the counter.
+*/
+test_4:
+	
+	ldx #$07     // row
+	ldy #$01     // column
+	lda #$04     // testnumber
+	jsr print_test_prompt
+
+	// test that timer is uninterupted by a write to high byte
+	// while running
+	lda #$00  // stop timera
+	sta $dc0e
+	lda #$aa  // latches -> aaaa
+	sta $dc04 // low byte
+	sta $dc05 // high byte
+	lda #$01
+	sta $dc0e // start timera
+	nop
+	nop
+	nop
+	nop
+	nop
+	lda $dc04     // store before value
+	sta PARAM2
+	lda $dc05
+	sta PARAM2+1
+	lda #$aa
+	sta $dc04
+	sta $dc05 // the write to high byte
+	nop
+	lda $dc04     // store after value
+	sta PARAM3
+	lda $dc05
+	sta PARAM3+1
+	lda #$00  // stop timera
+	sta $dc0e
+
+	lda #$0d     // lightgreen
+	sta PARAM1+1 // color
+	sec
+	lda PARAM2
+	sbc PARAM3   // subtract low bytes
+	sta PARAM4
+	lda PARAM2+1
+	sbc PARAM3+1
+	sta PARAM4+1
+
+	sec
+	lda PARAM4
+	sbc #$01     // -1 to check PARAM3<PARAM2
+	sta PARAM4
+	lda PARAM4+1
+	sbc #$00
+	sta PARAM4+1
+    beq test_4_print_timera
+	lda #$02     // red
+	sta PARAM1+1 // color
+test_4_print_timera:
+	lda PARAM2+1
+	sta PARAM1
+	ldx #$07 // row
+	ldy #$06 // column
+	jsr printhex
+	lda PARAM2
+	sta PARAM1
+	ldx #$07 // row
+	ldy #$08 // column
+	jsr printhex
+	
+	lda PARAM3+1
+	sta PARAM1
+	ldx #$07 // row
+	ldy #$0b // column
+	jsr printhex
+	lda PARAM3
+	sta PARAM1
+	ldx #$07 // row
+	ldy #$0d // column
+	jsr printhex
+
+	lda PARAM4+1
+	sta PARAM1
+	ldx #$07 // row
+	ldy #$10 // column
+	jsr printhex
+	lda PARAM4
+	sta PARAM1
+	ldx #$07 // row
+	ldy #$12 // column
+	jsr printhex
+
+	lda #$3d
+	sta $04fe
+	lda #$2d
+	sta $04f9
+	lda PARAM1+1
+	sta $d8fe
+	sta $d8f9
+	
 	rts
 
 /*	function: print_test_prompt
@@ -531,24 +643,6 @@ print_end:
 	rts
 
 _video_and_colormem_ptr_init_and_move_to_position:
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
 	txa
 	pha
 	lda #<VIDEOMEM
