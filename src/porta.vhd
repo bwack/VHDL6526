@@ -12,14 +12,12 @@ entity port_a is
     RS      : in  std_logic_vector(3 downto 0); -- register select
     RES_N   : in  std_logic; -- global reset
     Wr      : in  std_logic; -- read and write registers
--- INPUTS & OUTPUTS
--- IO interface to be used with IO buffer.
+-- I/O
     PA      : inout std_logic_vector(7 downto 0)
   );
 end entity port_a;
 
 architecture rtla of port_a is
-  signal PA_IN     : std_logic_vector(7 downto 0);
 -- REGISTERS      
   signal PRA       : std_logic_vector(7 downto 0); -- PA0-PA7 Peripheral Data Register
   signal DDRA      : std_logic_vector(7 downto 0); -- data direction of PA0-PA7 (1=out)
@@ -28,11 +26,9 @@ architecture rtla of port_a is
 begin
 
   BUFFERBITS: for i in 0 to 7 generate
-    PA(i) <= PRA(i) when DDRA(i) = '1' else 'H';
+    PA(i) <= PRA(i) when DDRA(i) = '1' else 'Z';
   end generate BUFFERBITS;
-  PA_IN <= PA;
-  DO <= data_out;
-
+ 
   --  PA_tris <= DDRA;
 -- WRITE REGISTERS
   process (PHI2,RES_N) is
@@ -68,8 +64,8 @@ begin
     end if;
   end process;
 
-  DO <= PA   when RS = x"0" else
-        DDRA when RS = x"2" else
+  DO <= PA    when RS = x"0" else
+        DDRA  when RS = x"2" else
         (others=>'0');
 
 end architecture rtla;
